@@ -205,9 +205,57 @@ docker build -t unbluff-api backend
 docker run -p 8080:8080 -e LLM_MODE=mock unbluff-api
 ```
 
+## Frontend
+
+React 18 + TypeScript (strict) + Vite + Tailwind, in `frontend/`. It is a thin client: every verdict,
+score and next step comes from the API.
+
+| Screen | Route | What it does |
+|---|---|---|
+| Landing | `/` | Pitch, **Audit My Readiness**, **View Demo Report** |
+| Setup | `/setup` | Role, mode (**Teach me** = `prepare`, **Challenge me** = `defense`), resume text or PDF → `POST /claims/extract` |
+| Claim ledger | `/ledger` | Edit or delete claims, remap skills, see blind spots → `POST /claims/confirm` |
+| Workspace | `/workspace/:sessionId` | Claims, L1→L3 questions, "I don't know", follow-ups, verdict + evidence, teach-now fix task, delayed retest |
+| Report | `/report/:sessionId` · `/report/demo` | Readiness ring, resume heatmap + evidence drawer, coverage grid, priorities, 7-day plan, fix tasks, retest status |
+
+The session ID lives in the URL, so a refresh re-fetches instead of losing the session. On load the app
+pings `/api/health` (90 s timeout) and shows "Waking up the server…" while the free backend starts.
+
+**Run against the local mock backend (port 8090):**
+
+```bash
+cd backend && LLM_MODE=mock STORE=memory PORT=8090 CORS_ORIGIN=http://localhost:5173 npm run dev
+```
+
+```bash
+cd frontend && cp .env.example .env && npm install && npm run dev   # http://localhost:5173
+```
+
+| Env var | Meaning |
+|---|---|
+| `VITE_API_URL` | Backend origin, e.g. `http://localhost:8090` or the Render URL. Never put keys here. |
+
+Checks: `npm run lint` (incl. jsx-a11y), `npm run typecheck`, `npm test`, `npm run build`, and an
+end-to-end API check that mirrors the UI's payloads: `API=http://localhost:8090 node scripts/e2e-check.mjs`.
+
+Accessibility: one `h1` per page, header/nav/main landmarks, labelled inputs, focus moves to each new
+question, `aria-live` for questions and verdicts, `role="status"` loaders, `role="alert"` errors, a modal
+evidence drawer (focus trap, Esc, focus return), verdicts always as label + icon + color, and
+`prefers-reduced-motion` respected.
+
+## How to demo (3 minutes)
+
+1. **View Demo Report**: always works, even if the model is rate-limited. Open a heatmap line to show
+   the evidence drawer (quotes, missing concepts, root cause, honest rewrite).
+2. **Audit My Readiness** → pick *Frontend Developer* and **Teach me** → paste 3 resume lines → confirm the ledger.
+3. Answer claim 1 with **I don't know**. It becomes an honest gap with a root cause, and the fix task opens right away.
+4. Answer the next two claims properly. The workspace then says *"Welcome back — a new scenario. Let's see if it stuck."*
+5. Pass the fresh-scenario retest → **See my report**: readiness goes up, and the claim shows
+   *"Verified after 2 other concepts · 0% → 100%"*.
+
 ## Tests and quality
 
-Latest run: **123 tests passing** (18 files). Coverage: **93.7% lines / 84.8% branches overall**,
+Latest run: **backend 126 tests** (19 files) and **frontend 25 tests** (6 files), all passing. Backend coverage: **93.7% lines / 84.9% branches overall**,
 **100% lines on `src/core`** (the deterministic scoring core; CI enforces ≥ 95%).
 
 ```bash

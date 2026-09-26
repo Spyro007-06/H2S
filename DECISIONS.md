@@ -281,3 +281,13 @@ everything once gcloud is available.
 - **Lint:** added `eslint-plugin-jsx-a11y` (recommended) and `no-console: error`.
 - **LLM markdown** (fix tasks, plan items) is rendered by a tiny React-only renderer (paragraphs,
   bullets, bold, code). No `dangerouslySetInnerHTML`, so model output can't inject HTML.
+- **Teammate work integrated, not rewritten:** PR #2's Landing sections, Setup (role/mode radio cards,
+  PDF import) and `DemoReportButton` were kept. Their Setup never sent the mode to the backend; it now
+  sends `mode: "prepare" | "defense"` (the `PreparationMode` type was removed, since the backend rejects
+  `prep_mode`). Their demo button now hands its fetched report to `/report/demo` via router state.
+- **Workspace / report survive refresh:** the session ID is in the URL; on a cold load the workspace
+  rehydrates claims and progress from `GET /api/report/:id`.
+- **Wake-up gate** only runs outside unit tests (`import.meta.env.MODE !== "test"`); tests mock the API
+  per test, and the gate has its own tests.
+- **No `gh` CLI here**, so no GitHub PR was opened. `integration` was merged into `main` with a `--no-ff`
+  merge commit (never force-pushed). CI runs on the push to main.
