@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/endpoints";
+import { routes } from "@/lib/routes";
 
 /**
  * Drives the "View Demo Report" flow through the existing API client and
@@ -23,7 +24,7 @@ export function useDemoReport() {
       // on which endpoint it called — it is not part of the Report contract
       // type (CONTRACT.md's Report has no such field) and is never invented
       // as API data.
-      navigate(`/report/${report.session_id}`, { state: { report, isDemo: true } });
+      navigate(routes.demoReport, { state: { report } });
     } catch (err) {
       setError(err);
     } finally {

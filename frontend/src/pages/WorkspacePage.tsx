@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { buttonClasses } from "@/lib/buttonClasses";
 import { cn } from "@/lib/cn";
 
-export const WorkspacePage: React.FC = () => {
+const WorkspacePage: React.FC = () => {
   return (
     <div className="mx-auto max-w-3xl p-8">
       <h2 className="mb-2 text-2xl font-bold text-ink-primary">
@@ -29,3 +29,4 @@ export const WorkspacePage: React.FC = () => {
     </div>
   );
 };
+export default WorkspacePage;

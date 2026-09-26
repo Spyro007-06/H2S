@@ -268,3 +268,16 @@ everything once gcloud is available.
   `levels_passed`, `next_claim_id`, `retest`. They are always equal to `grade`, `claim.verdict`,
   `claim.levels_passed`, `progress.next_claim_id` and `claim.retest` (an integration test asserts this
   on every turn type). New code should read the canonical fields.
+
+## Frontend integration
+
+- **`report.is_demo` does not exist in the contract.** The demo report is recognised by its route
+  (`/report/demo` → `GET /api/demo/report`) and shows a "Demo data" badge. Its `session_id` is
+  `"s_demo"`. No backend field was added.
+- **Backend 400 messages are shown verbatim** (`getErrorMessage`): they are written for users, e.g.
+  "Retest unlocks after 2 more concepts". Other codes keep the generic friendly copy.
+- **Dev server moved to :5173** to match `CORS_ORIGIN=http://localhost:5173` in the run instructions;
+  `.claude/launch.json` (committed by the frontend dev) updated to the same port, nothing else changed.
+- **Lint:** added `eslint-plugin-jsx-a11y` (recommended) and `no-console: error`.
+- **LLM markdown** (fix tasks, plan items) is rendered by a tiny React-only renderer (paragraphs,
+  bullets, bold, code). No `dangerouslySetInnerHTML`, so model output can't inject HTML.
