@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Link, NavLink } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { SessionProvider } from "@/state/SessionContext";
 import { InterrogationProvider } from "@/state/InterrogationContext";
 import { LandingPage } from "@/pages/LandingPage";
@@ -8,15 +8,8 @@ import { LedgerPage } from "@/pages/LedgerPage";
 import { WorkspacePage } from "@/pages/WorkspacePage";
 import { ReportPage } from "@/pages/ReportPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
-import { cn } from "@/lib/cn";
-
-const NAV_LINKS = [
-  { to: "/", label: "Home", end: true },
-  { to: "/setup", label: "Setup" },
-  { to: "/ledger", label: "Ledger" },
-  { to: "/interrogate", label: "Workspace" },
-  { to: "/report/s_demo", label: "Report" },
-] as const;
+import { buttonClasses } from "@/lib/buttonClasses";
+import { DemoReportButton } from "@/components/common/DemoReportButton";
 
 export const App: React.FC = () => {
   return (
@@ -41,22 +34,14 @@ export const App: React.FC = () => {
                   />
                   UNBLUFF
                 </Link>
-                <nav className="-mx-1 flex items-center gap-4 overflow-x-auto px-1 text-sm sm:gap-6">
-                  {NAV_LINKS.map((link) => (
-                    <NavLink
-                      key={link.to}
-                      to={link.to}
-                      end={"end" in link ? link.end : undefined}
-                      className={({ isActive }) =>
-                        cn(
-                          "shrink-0 font-medium text-ink-muted transition-colors hover:text-ink-primary",
-                          isActive && "text-primary"
-                        )
-                      }
-                    >
-                      {link.label}
-                    </NavLink>
-                  ))}
+                <nav
+                  aria-label="Primary"
+                  className="flex flex-wrap items-center gap-3 text-sm"
+                >
+                  <DemoReportButton variant="ghost" size="sm" />
+                  <Link to="/setup" className={buttonClasses("primary", "sm")}>
+                    Audit My Readiness
+                  </Link>
                 </nav>
               </div>
             </header>

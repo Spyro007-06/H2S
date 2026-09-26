@@ -50,24 +50,26 @@ function StatusChip({
   iconName,
   fg,
   bg,
+  textColor,
   className,
 }: {
   label: string;
   iconName: string;
   fg: string;
   bg: string;
+  textColor: string;
   className?: string;
 }) {
   const Icon = ICONS[iconName] ?? Clock;
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-sm border-l-2 px-2 py-1 text-xs font-medium",
         className
       )}
-      style={{ color: fg, backgroundColor: bg }}
+      style={{ borderLeftColor: fg, backgroundColor: bg, color: textColor }}
     >
-      <Icon size={14} aria-hidden="true" />
+      <Icon size={14} aria-hidden="true" style={{ color: fg }} />
       {label}
     </span>
   );

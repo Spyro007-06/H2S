@@ -13,7 +13,13 @@ export type TurnType = "question" | "clarify" | "done";
 export type QuestionKind = "question" | "clarify" | "retest";
 export type LlmMode = "live" | "mock";
 export type RetestStatus = "scheduled" | "due" | "done";
-export type PreparationMode = "teach" | "challenge" | "teach_me" | "challenge_me";
+/**
+ * Setup's "Teach me" / "Challenge me" choice. Local UI/session state only —
+ * `backend/src/types.ts` has no such field on ExtractRequest yet (confirmed
+ * against the actual backend source, which also has no server.ts/routes
+ * implemented), so it is never sent over the wire. See DECISIONS.md.
+ */
+export type PreparationMode = "teach" | "challenge";
 
 export type ErrorCode =
   | "BAD_REQUEST"
@@ -218,7 +224,6 @@ export interface ExtractRequest {
   role_id: string;
   resume_text?: string | null; // <= 20000 chars
   declared_skills?: string[]; // <= 20 chips, each <= 60 chars
-  prep_mode?: PreparationMode; // Additive learning loop: "teach" | "challenge"
 }
 
 export interface ClaimsResponse {
