@@ -3,12 +3,12 @@
 services:
   - type: web
     name: unbluff-api
-    runtime: docker
+    runtime: node
     plan: free
     region: singapore
     rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
     buildFilter:

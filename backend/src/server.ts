@@ -47,7 +47,7 @@ function main(): void {
   const service = new AssessmentService({ store, llm, roles, logger });
 
   const app = createApp({ service, roles, llm, logger, demoReportJson, corsOrigin: config.CORS_ORIGIN });
-  const server = app.listen(config.PORT, (err?: Error) => {
+  const server = app.listen(config.PORT, "0.0.0.0", (err?: Error) => {
     if (err) {
       // Express 5 reports bind errors (e.g. EADDRINUSE) here instead of throwing.
       logger.fatal({ port: config.PORT, error: err.message }, "failed to start server");
