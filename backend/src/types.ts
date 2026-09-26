@@ -240,7 +240,7 @@ export interface InterrogateRequest {
   session_id: string;
   claim_id: string;
   mode?: Mode; // default "assess"
-  answer?: string; // omit to start (or resume) the claim; <= 4000 chars
+  answer?: string | null; // omit (or null) to start/resume the claim; <= 4000 chars
 }
 
 export interface TurnResponse {
@@ -255,6 +255,12 @@ export interface TurnResponse {
   progress: Progress;
   next_mode: Mode | null; // added: same as progress.next_mode
   teach_now: boolean; // added: prepare mode and this turn finished the claim as shaky/bluff/honest_gap
+  // Backward-compatible aliases (always equal to the canonical field):
+  last_grade: Grade | null; // alias of grade
+  verdict: Verdict; // alias of claim.verdict
+  levels_passed: LevelsPassed; // alias of claim.levels_passed
+  next_claim_id: string | null; // alias of progress.next_claim_id
+  retest: RetestResult | null; // alias of claim.retest
 }
 
 export interface FixTaskRequest {

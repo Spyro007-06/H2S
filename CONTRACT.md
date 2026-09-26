@@ -311,7 +311,7 @@ export interface InterrogateRequest {
   session_id: string;
   claim_id: string;
   mode?: Mode; // default "assess"
-  answer?: string; // omit to start (or resume) the claim; <= 4000 chars
+  answer?: string | null; // omit (or null) to start/resume the claim; <= 4000 chars
 }
 
 export interface TurnResponse {
@@ -326,6 +326,12 @@ export interface TurnResponse {
   progress: Progress;
   next_mode: Mode | null; // added: same as progress.next_mode
   teach_now: boolean; // added: prepare mode and this turn finished the claim as shaky/bluff/honest_gap
+  // Backward-compatible aliases (always equal to the canonical field):
+  last_grade: Grade | null; // alias of grade
+  verdict: Verdict; // alias of claim.verdict
+  levels_passed: LevelsPassed; // alias of claim.levels_passed
+  next_claim_id: string | null; // alias of progress.next_claim_id
+  retest: RetestResult | null; // alias of claim.retest
 }
 
 export interface FixTaskRequest {
@@ -375,6 +381,12 @@ One endpoint drives both assessment and retest.
 | no `answer`, claim in progress | Returns the current open question again (safe to call on page reload). |
 | `answer`, claim in progress | Grades the answer and returns the next turn. |
 | `answer`, claim idle | 400. |
+| `answer: null` | Same as omitting `answer`. |
+
+`TurnResponse` also carries five **alias** fields for older clients, each always equal to its
+canonical field: `last_grade` = `grade`, `verdict` = `claim.verdict`, `levels_passed` =
+`claim.levels_passed`, `next_claim_id` = `progress.next_claim_id`, `retest` = `claim.retest`.
+New code should read the canonical fields.
 
 Turn rules:
 

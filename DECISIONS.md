@@ -177,3 +177,13 @@ everything once gcloud is available.
   a clear config error in live mode when `GEMINI_API_KEY` is missing.
 - The Gemini key is declared `sync: false` in `render.yaml`: Render prompts for it once in its
   dashboard; it never enters the repo.
+
+## Compatibility hardening
+
+- `POST /api/interrogate` accepts `answer: null` as identical to an omitted answer (start or resume, no
+  LLM call on resume). Blank strings are still 400, so only `null` means "no answer".
+  `InterrogateRequest.answer` is now `string | null` (widened, not breaking).
+- `TurnResponse` gained five **alias** fields for older clients: `last_grade`, `verdict`,
+  `levels_passed`, `next_claim_id`, `retest`. They are always equal to `grade`, `claim.verdict`,
+  `claim.levels_passed`, `progress.next_claim_id` and `claim.retest` (an integration test asserts this
+  on every turn type). New code should read the canonical fields.

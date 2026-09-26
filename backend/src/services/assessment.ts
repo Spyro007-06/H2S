@@ -67,7 +67,7 @@ export interface InterrogateInput {
   session_id: string;
   claim_id: string;
   mode?: Mode;
-  answer?: string;
+  answer?: string | null;
 }
 
 /**
@@ -200,7 +200,7 @@ export class AssessmentService {
       const cursor = session.cursors[claim.id];
       const skill = role.skills.find((s) => s.id === claim.skill_id) ?? null;
 
-      if (input.answer === undefined) {
+      if (input.answer === undefined || input.answer === null) {
         if (cursor) return this.resumeTurn(session, claim, cursor);
         return this.startClaim(session, role, skill, claim, input.mode ?? "assess");
       }
@@ -584,5 +584,11 @@ function turn(
     progress: prog,
     next_mode: prog.next_mode,
     teach_now: teachNow,
+    // Backward-compatible aliases (CONTRACT.md §4).
+    last_grade: grade,
+    verdict: claim.verdict,
+    levels_passed: claim.levels_passed,
+    next_claim_id: prog.next_claim_id,
+    retest: claim.retest,
   };
 }

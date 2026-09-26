@@ -37,7 +37,8 @@ export const InterrogateRequestSchema = z.strictObject({
   session_id: id("session_id"),
   claim_id: id("claim_id"),
   mode: z.enum(["assess", "retest"]).optional(),
-  answer: z.string().trim().min(1, "answer cannot be empty").max(4000, "answer must be at most 4000 characters").optional(),
+  // null is accepted and treated exactly like an omitted answer (start/resume).
+  answer: z.string().trim().min(1, "answer cannot be empty").max(4000, "answer must be at most 4000 characters").nullish(),
 });
 
 export const FixTaskRequestSchema = z.strictObject({

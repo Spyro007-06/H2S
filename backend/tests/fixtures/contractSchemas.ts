@@ -46,6 +46,14 @@ const QA = z.strictObject({
   asked_at: z.iso.datetime(),
 });
 
+const RetestSchema = z.strictObject({
+  attempted: z.boolean(),
+  passed: z.boolean(),
+  before: unit,
+  after: unit,
+  interleaved_claims: z.number().int().min(0),
+});
+
 const FixTask = z.strictObject({
   claim_id: z.string(),
   skill_id: z.string().nullable(),
@@ -67,9 +75,7 @@ export const ClaimSchema = z.strictObject({
   missing_concepts: z.array(z.string()),
   evidence: z.array(z.strictObject({ level: Level, criterion: Criterion, passed: z.boolean(), quote: z.string() })),
   qa: z.array(QA),
-  retest: z
-    .strictObject({ attempted: z.boolean(), passed: z.boolean(), before: unit, after: unit, interleaved_claims: z.number().int().min(0) })
-    .nullable(),
+  retest: RetestSchema.nullable(),
   fix_task: FixTask.nullable(),
   rewrite: z.string().nullable(),
   root_cause: z.string().nullable(),
@@ -139,6 +145,11 @@ export const TurnResponseSchema = z.strictObject({
   progress: ProgressSchema,
   next_mode: Mode.nullable(),
   teach_now: z.boolean(),
+  last_grade: GradeSchema.nullable(),
+  verdict: Verdict,
+  levels_passed: LevelsPassed,
+  next_claim_id: z.string().nullable(),
+  retest: RetestSchema.nullable(),
 });
 
 export const ErrorSchema = z.strictObject({
