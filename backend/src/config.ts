@@ -4,8 +4,14 @@ const EnvSchema = z
   .object({
     LLM_MODE: z.enum(["live", "mock"]).default("live"),
     GEMINI_API_KEY: z.string().optional(),
-    GEMINI_MODEL: z.string().optional(),
-    GEMINI_FALLBACK_MODEL: z.string().optional(),
+    GEMINI_MODEL: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() !== "" ? v : "gemini-3.1-flash-lite")),
+    GEMINI_FALLBACK_MODEL: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() !== "" ? v : "gemini-3.6-flash")),
     GRADE_THINKING: z.enum(["MINIMAL", "LOW", "MEDIUM", "HIGH"]).default("LOW"),
     GOOGLE_GENAI_USE_VERTEXAI: z
       .enum(["true", "false", "1", "0"])

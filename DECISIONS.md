@@ -121,7 +121,7 @@ Running log of judgement calls, contract notes, stubs and audit results.
 
 - **Model:** originally `gemini-3.6-flash` (≈1.5–3 s per call); switched to `gemini-3.1-flash-lite` as primary because of the free-tier daily cap (see Quota). `gemini-2.5-flash` is not
   available to new keys; `gemini-3.8-flash` / `gemini-flash-latest` returned frequent 503/429;
-  `gemini-3.5-flash` timed out. `GEMINI_MODEL` stays required with no hardcoded default.
+  `gemini-3.5-flash` timed out. `GEMINI_MODEL` defaults to `gemini-3.1-flash-lite` and `GEMINI_FALLBACK_MODEL` defaults to `gemini-3.6-flash` to prevent deployment crashes when omitted, while still allowing explicit overrides via environment variables.
 - **Fallback model (addition):** `GEMINI_FALLBACK_MODEL` (e.g. `gemini-3.1-flash-lite`). On a 429/5xx
   the single retry goes to the fallback, with no invalid-JSON note. After a quota 429 the primary is
   skipped for the "retry in Ns" window (max 60 s) to avoid wasted calls. Invalid-JSON retries stay

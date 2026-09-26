@@ -76,7 +76,10 @@ describe("prompts carry the required context", () => {
 
 describe("config", () => {
   it("defaults to live and requires model + key in live mode", () => {
-    expect(() => loadConfig({})).toThrow(/GEMINI_MODEL is required.*GEMINI_API_KEY is required/);
+    expect(() => loadConfig({})).toThrow(/GEMINI_API_KEY is required/);
+    const liveConfig = loadConfig({ GEMINI_API_KEY: "secret-key" });
+    expect(liveConfig.GEMINI_MODEL).toBe("gemini-3.1-flash-lite");
+    expect(liveConfig.GEMINI_FALLBACK_MODEL).toBe("gemini-3.6-flash");
   });
 
   it("mock mode needs nothing and applies defaults", () => {
