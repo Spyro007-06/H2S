@@ -1,5 +1,4 @@
-// ===== UNBLUFF Frontend Contract Types =====
-// Source of truth: CONTRACT.md §4 + backend/src/types.ts + Additive Learning-Loop Extension
+// ===== UNBLUFF shared types — copied EXACTLY from CONTRACT.md §4 =====
 
 // ---------- Enums ----------
 export type Level = 1 | 2 | 3;
@@ -12,15 +11,8 @@ export type Mode = "assess" | "retest";
 export type TurnType = "question" | "clarify" | "done";
 export type QuestionKind = "question" | "clarify" | "retest";
 export type LlmMode = "live" | "mock";
-export type RetestStatus = "scheduled" | "due" | "done";
-/**
- * Setup's "Teach me" / "Challenge me" choice. Local UI/session state only —
- * `backend/src/types.ts` has no such field on ExtractRequest yet (confirmed
- * against the actual backend source, which also has no server.ts/routes
- * implemented), so it is never sent over the wire. See DECISIONS.md.
- */
-export type PreparationMode = "teach" | "challenge";
-
+export type SessionMode = "prepare" | "defense"; // added (learning loop)
+export type RetestStatus = "none" | "scheduled" | "due" | "done"; // added (learning loop)
 export type ErrorCode =
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -46,6 +38,7 @@ export interface RoleSkill {
   description: string;
   keywords: string[];
   levels: LevelCriteria;
+  prerequisites: string[]; // added: 3–5 concepts, most fundamental first
 }
 
 export interface Role {
@@ -75,6 +68,7 @@ export interface Grade {
   needs_clarification: boolean;
   level_passed: boolean; // computed by backend code, never by the LLM
   guard_flips: Criterion[]; // criteria forced to false because the quote was not in the answer
+  root_cause: string | null; // added: one of the skill's prerequisites (validated in code) or null
 }
 
 // ---------- Claims ----------
@@ -93,7 +87,6 @@ export interface Evidence {
   criterion: Criterion;
   passed: boolean;
   quote: string; // verbatim from the student's answer
-  root_cause?: string | null; // Additive learning loop: root cause when evidence failed
 }
 
 export interface RetestResult {
@@ -101,12 +94,13 @@ export interface RetestResult {
   passed: boolean; // after > before
   before: number;
   after: number;
-  interleaved_claims?: number; // Additive learning loop: "Verified after N other concepts"
+  interleaved_claims: number; // added: other claims completed between the fix task and the retest start
 }
 
 export interface FixTask {
   claim_id: string;
   skill_id: string | null;
+  root_cause: string | null; // added: the prerequisite the task targets first, if diagnosed
   missing_concepts: string[];
   explanation: string; // markdown, <= 120 words
   exercise: string; // markdown
@@ -127,9 +121,9 @@ export interface Claim {
   retest: RetestResult | null;
   fix_task: FixTask | null;
   rewrite: string | null; // honest resume rewrite, only for shaky/bluff/honest_gap
-  // Additive learning-loop fields:
-  root_cause?: string | null;
-  retest_status?: RetestStatus;
+  root_cause: string | null; // added: root cause from the failing level (null if none / passed)
+  retest_status: RetestStatus; // added
+  retest_unlocks_after: number | null; // added: other claims still to finish before the retest is due
 }
 
 export interface ClaimInput {
@@ -148,8 +142,8 @@ export interface BlindSpot {
 export interface Progress {
   claims_total: number;
   claims_done: number; // claims whose verdict is not "pending"
-  next_claim_id: string | null; // first "pending" claim in list order or retest target
-  next_mode?: Mode; // Additive learning loop: backend specifies whether next turn is assess or retest
+  next_claim_id: string | null; // first due retest, else first "pending" claim, else null (see §5)
+  next_mode: Mode | null; // added: what to do with next_claim_id
 }
 
 // ---------- Report ----------
@@ -195,6 +189,7 @@ export interface PlanItem {
 
 export interface Report {
   session_id: string;
+  mode: SessionMode; // added
   role: { id: string; name: string };
   generated_at: string;
   readiness: number; // 0..100
@@ -222,6 +217,7 @@ export interface RolesResponse {
 
 export interface ExtractRequest {
   role_id: string;
+  mode?: SessionMode; // added, default "defense"
   resume_text?: string | null; // <= 20000 chars
   declared_skills?: string[]; // <= 20 chips, each <= 60 chars
 }
@@ -229,6 +225,7 @@ export interface ExtractRequest {
 export interface ClaimsResponse {
   session_id: string;
   role_id: string;
+  mode: SessionMode; // added
   claims: Claim[];
   blind_spots: BlindSpot[];
   progress: Progress;
@@ -243,7 +240,7 @@ export interface InterrogateRequest {
   session_id: string;
   claim_id: string;
   mode?: Mode; // default "assess"
-  answer?: string; // omit to start (or resume) the claim; <= 4000 chars
+  answer?: string | null; // omit (or null) to start/resume the claim; <= 4000 chars
 }
 
 export interface TurnResponse {
@@ -256,10 +253,14 @@ export interface TurnResponse {
   grade: Grade | null; // grade of the answer just submitted; null on start
   claim: Claim;
   progress: Progress;
-  // Additive learning loop fields:
-  teach_now?: boolean;
-  next_claim_id?: string | null;
-  next_mode?: Mode;
+  next_mode: Mode | null; // added: same as progress.next_mode
+  teach_now: boolean; // added: prepare mode and this turn finished the claim as shaky/bluff/honest_gap
+  // Backward-compatible aliases (always equal to the canonical field):
+  last_grade: Grade | null; // alias of grade
+  verdict: Verdict; // alias of claim.verdict
+  levels_passed: LevelsPassed; // alias of claim.levels_passed
+  next_claim_id: string | null; // alias of progress.next_claim_id
+  retest: RetestResult | null; // alias of claim.retest
 }
 
 export interface FixTaskRequest {
@@ -270,8 +271,5 @@ export interface FixTaskRequest {
 export type FixTaskResponse = FixTask;
 
 export interface ApiErrorBody {
-  error: {
-    code: ErrorCode;
-    message: string;
-  };
+  error: { code: ErrorCode; message: string };
 }

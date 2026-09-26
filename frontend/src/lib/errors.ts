@@ -26,6 +26,8 @@ export function isRetryableError(error: unknown): boolean {
 /** Maps any thrown value to copy that is safe to render to the user. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    // 400 messages are written for users by the backend (e.g. "Retest unlocks after 2 more concepts").
+    if (error.code === "BAD_REQUEST" && error.message) return error.message;
     return ERROR_COPY[error.code as ErrorCode] ?? error.message;
   }
   if (error instanceof Error) {

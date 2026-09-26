@@ -268,3 +268,26 @@ everything once gcloud is available.
   `levels_passed`, `next_claim_id`, `retest`. They are always equal to `grade`, `claim.verdict`,
   `claim.levels_passed`, `progress.next_claim_id` and `claim.retest` (an integration test asserts this
   on every turn type). New code should read the canonical fields.
+
+## Frontend integration
+
+- **`report.is_demo` does not exist in the contract.** The demo report is recognised by its route
+  (`/report/demo` → `GET /api/demo/report`) and shows a "Demo data" badge. Its `session_id` is
+  `"s_demo"`. No backend field was added.
+- **Backend 400 messages are shown verbatim** (`getErrorMessage`): they are written for users, e.g.
+  "Retest unlocks after 2 more concepts". Other codes keep the generic friendly copy.
+- **Dev server moved to :5173** to match `CORS_ORIGIN=http://localhost:5173` in the run instructions;
+  `.claude/launch.json` (committed by the frontend dev) updated to the same port, nothing else changed.
+- **Lint:** added `eslint-plugin-jsx-a11y` (recommended) and `no-console: error`.
+- **LLM markdown** (fix tasks, plan items) is rendered by a tiny React-only renderer (paragraphs,
+  bullets, bold, code). No `dangerouslySetInnerHTML`, so model output can't inject HTML.
+- **Teammate work integrated, not rewritten:** PR #2's Landing sections, Setup (role/mode radio cards,
+  PDF import) and `DemoReportButton` were kept. Their Setup never sent the mode to the backend; it now
+  sends `mode: "prepare" | "defense"` (the `PreparationMode` type was removed, since the backend rejects
+  `prep_mode`). Their demo button now hands its fetched report to `/report/demo` via router state.
+- **Workspace / report survive refresh:** the session ID is in the URL; on a cold load the workspace
+  rehydrates claims and progress from `GET /api/report/:id`.
+- **Wake-up gate** only runs outside unit tests (`import.meta.env.MODE !== "test"`); tests mock the API
+  per test, and the gate has its own tests.
+- **No `gh` CLI here**, so no GitHub PR was opened. `integration` was merged into `main` with a `--no-ff`
+  merge commit (never force-pushed). CI runs on the push to main.

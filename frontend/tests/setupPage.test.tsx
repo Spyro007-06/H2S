@@ -7,6 +7,7 @@ import { SetupPage } from "@/pages/SetupPage";
 import { api } from "@/api/endpoints";
 import { ApiError } from "@/api/types";
 import type { RoleSummary, ClaimsResponse } from "@/types/contract";
+import { makeClaim, makeClaimsResponse } from "./fixtures";
 
 vi.mock("@/api/endpoints", () => ({
   api: { getRoles: vi.fn(), extractClaims: vi.fn() },
@@ -30,30 +31,10 @@ const mockRoles: RoleSummary[] = [
   },
 ];
 
-const mockClaimsResponse: ClaimsResponse = {
-  session_id: "s_test_456",
-  role_id: "frontend_developer",
-  claims: [
-    {
-      id: "CL-001",
-      text: "Built a React dashboard",
-      resume_line: "Built a React dashboard",
-      skill_id: "react_state",
-      source: "resume",
-      verdict: "pending",
-      levels_passed: 0,
-      proficiency: 0,
-      missing_concepts: [],
-      evidence: [],
-      qa: [],
-      retest: null,
-      fix_task: null,
-      rewrite: null,
-    },
-  ],
-  blind_spots: [],
-  progress: { claims_total: 1, claims_done: 0, next_claim_id: "CL-001" },
-};
+const mockClaimsResponse: ClaimsResponse = makeClaimsResponse(
+  [makeClaim({ text: "Built a React dashboard", resume_line: "Built a React dashboard" })],
+  { session_id: "s_test_456", blind_spots: [] },
+);
 
 function renderSetup() {
   return render(
@@ -156,10 +137,14 @@ describe("SetupPage — validation and submission", () => {
     await waitFor(() => {
       expect(screen.getByText("LEDGER_PLACEHOLDER")).toBeInTheDocument();
     });
+    // Required: the contract field is `mode` ("prepare" for Teach me); `prep_mode` is rejected by the backend.
     expect(api.extractClaims).toHaveBeenCalledWith({
       role_id: "frontend_developer",
+      mode: "prepare",
       resume_text: "I built a React dashboard.",
     });
+    const payload = vi.mocked(api.extractClaims).mock.calls[0]?.[0] as unknown as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("prep_mode");
   });
 
   it("disables submit while the request is in flight", async () => {

@@ -1,23 +1,23 @@
 import React from "react";
 import { CardRadioGroup } from "@/components/ui/CardRadioGroup";
-import type { PreparationMode } from "@/types/contract";
+import type { SessionMode } from "@/types/contract";
 
 const MODE_OPTIONS = [
   {
-    value: "teach" as PreparationMode,
+    value: "prepare" as SessionMode,
     title: "Teach me — Prepare",
     description: "Find the gaps before the interview does. UNBLUFF flags weak areas and helps you close them first.",
   },
   {
-    value: "challenge" as PreparationMode,
+    value: "defense" as SessionMode,
     title: "Challenge me — Interview Defense",
     description: "Defend what your resume claims, right now, under the same pressure a real interviewer would apply.",
   },
 ];
 
 interface ModeSelectorProps {
-  value: PreparationMode | null;
-  onChange: (mode: PreparationMode) => void;
+  value: SessionMode | null;
+  onChange: (mode: SessionMode) => void;
 }
 
 export const ModeSelector: React.FC<ModeSelectorProps> = ({ value, onChange }) => {
