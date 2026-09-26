@@ -9,6 +9,7 @@ export const routes = {
   ledger: "/ledger",
   report: (sessionId: string) => `/report/${encodeURIComponent(sessionId)}`,
   demoReport: `/report/${DEMO_SESSION}`,
+  roadmap: (sessionId?: string | null) => (sessionId ? `/roadmap?session=${encodeURIComponent(sessionId)}` : "/roadmap"),
   workspace: (sessionId: string, claimId?: string, mode?: Mode) => {
     const base = `/workspace/${encodeURIComponent(sessionId)}`;
     if (!claimId) return base;

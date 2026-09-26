@@ -17,6 +17,7 @@ import { routes } from "@/lib/routes";
 // Heavier screens are code-split.
 const WorkspacePage = lazy(() => import("@/pages/WorkspacePage"));
 const ReportPage = lazy(() => import("@/pages/ReportPage"));
+const RoadmapPage = lazy(() => import("@/pages/RoadmapPage"));
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   cn("shrink-0 font-medium text-ink-muted transition-colors hover:text-ink-primary", isActive && "text-primary");
@@ -40,6 +41,9 @@ const AppNav: React.FC = () => {
           </NavLink>
         </>
       )}
+      <NavLink to={routes.roadmap(sid)} className={navClass}>
+        Roadmap
+      </NavLink>
       <DemoReportButton variant="ghost" size="sm" />
       <Link to={routes.setup} className={buttonClasses("primary", "sm")}>
         Audit My Readiness
@@ -56,6 +60,7 @@ export const AppRoutes: React.FC = () => (
       <Route path="/ledger" element={<LedgerPage />} />
       <Route path="/workspace/:sessionId" element={<WorkspacePage />} />
       <Route path="/report/:sessionId" element={<ReportPage />} />
+      <Route path="/roadmap" element={<RoadmapPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   </Suspense>

@@ -1,7 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { Database } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Database, Map } from "lucide-react";
 import type { Report } from "@/types/contract";
 import { Dialog } from "@/components/ui/Dialog";
+import { buttonClasses } from "@/lib/buttonClasses";
+import { routes } from "@/lib/routes";
 import { ClaimEvidence } from "./ClaimEvidence";
 import { PracticeSection } from "./PracticeSection";
 import { ResumeHeatmap } from "./ResumeHeatmap";
@@ -35,6 +38,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ report, isDemo, onChange
           {report.role.name} · {report.mode === "prepare" ? "Teach me" : "Challenge me"} ·{" "}
           {report.progress.claims_done}/{report.progress.claims_total} claims assessed
         </span>
+        <Link to={routes.roadmap(isDemo ? null : report.session_id)} className={buttonClasses("secondary", "sm", "ml-auto")}>
+          <Map size={14} aria-hidden="true" />
+          View 4-week roadmap
+        </Link>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
