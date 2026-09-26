@@ -1,25 +1,71 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { Card } from "@/components/ui/Card";
+import React, { useState } from "react";
+import { StepProgress } from "@/components/common/StepProgress";
+import { RoleSelector } from "@/components/setup/RoleSelector";
+import { ModeSelector } from "@/components/setup/ModeSelector";
+import { ResumeInput } from "@/components/setup/ResumeInput";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { buttonClasses } from "@/lib/buttonClasses";
-import { cn } from "@/lib/cn";
+import { useExtractClaims } from "@/hooks/useExtractClaims";
+import type { PreparationMode } from "@/types/contract";
 
 export const SetupPage: React.FC = () => {
+  const [roleId, setRoleId] = useState<string | null>(null);
+  const [mode, setMode] = useState<PreparationMode | null>(null);
+  const [resumeText, setResumeText] = useState("");
+  const { isLoading, error, extract } = useExtractClaims();
+
+  const canSubmit = Boolean(roleId) && Boolean(mode) && resumeText.trim().length > 0;
+
+  function handleSubmit() {
+    if (!canSubmit || !roleId || !mode) return;
+    void extract({ role_id: roleId, resume_text: resumeText }, mode);
+  }
+
   return (
-    <div className="mx-auto max-w-2xl p-8">
-      <h2 className="mb-2 text-2xl font-bold text-ink-primary">Setup</h2>
-      <p className="mb-6 text-ink-secondary">
-        Select your target role and preparation mode (Teach me / Challenge me).
+    <div className="mx-auto max-w-2xl p-4 pb-16 pt-8 sm:p-8">
+      <StepProgress current={1} />
+
+      <h1 className="mt-6 text-2xl font-bold tracking-tight text-ink-primary sm:text-3xl">
+        Prepare your claims
+      </h1>
+      <p className="mt-2 text-ink-secondary">
+        Choose the role you&rsquo;re targeting and give UNBLUFF the resume you want to
+        defend.
       </p>
-      <Card>
-        <p className="text-sm text-ink-muted">
-          Architectural placeholder — role picker, resume upload and skill chips ship
-          in the next milestone.
-        </p>
-      </Card>
-      <Link to="/ledger" className={cn("mt-6 inline-flex", buttonClasses())}>
-        Proceed to Ledger →
-      </Link>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-subtle">
+          Role
+        </h2>
+        <RoleSelector value={roleId} onChange={setRoleId} />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-subtle">
+          Mode
+        </h2>
+        <ModeSelector value={mode} onChange={setMode} />
+      </section>
+
+      <section className="mt-8">
+        <ResumeInput value={resumeText} onChange={setResumeText} />
+      </section>
+
+      {error !== null && (
+        <ErrorState error={error} onRetry={handleSubmit} className="mt-6" />
+      )}
+
+      <div className="mt-8 flex justify-end">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit || isLoading}
+          aria-busy={isLoading}
+          className={buttonClasses("primary", "md")}
+        >
+          {isLoading ? "Extracting your claims…" : "Extract My Claims"}
+        </button>
+      </div>
     </div>
   );
 };

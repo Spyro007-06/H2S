@@ -29,54 +29,57 @@ export default {
           dark: "#3730A3",
           soft: "#EEF2FF",
         },
-        // Contract-defined verdict colors (CONTRACT.md §6)
+        // Verdict accent colors — UNBLUFF Design Bible §6 (contract-locked).
+        // `fg` is icon/left-border accent only (3:1 non-text contrast is
+        // enough there); label text uses ink tokens, never `fg` directly —
+        // see src/styles/tokens.ts for the documented reasoning.
         verdict: {
           defended: {
-            fg: "#166534",
+            fg: "#059669",
             bg: "#DCFCE7",
           },
           shaky: {
-            fg: "#92400E",
+            fg: "#D97706",
             bg: "#FEF3C7",
           },
           bluff: {
-            fg: "#991B1B",
+            fg: "#DC2626",
             bg: "#FEE2E2",
           },
           honest_gap: {
-            fg: "#1E40AF",
-            bg: "#DBEAFE",
+            fg: "#4F46E5",
+            bg: "#EEF2FF",
           },
           error: {
-            fg: "#374151",
-            bg: "#F3F4F6",
+            fg: "#64748B",
+            bg: "#F1F5F9",
           },
           pending: {
-            fg: "#334155",
+            fg: "#94A3B8",
             bg: "#F1F5F9",
           },
         },
-        // Contract-defined skill state colors (CONTRACT.md §6)
+        // Skill state accent colors — Design Bible §7 (contract-locked)
         skill: {
           ready: {
-            fg: "#166534",
+            fg: "#059669",
             bg: "#DCFCE7",
           },
           needs_work: {
-            fg: "#92400E",
+            fg: "#D97706",
             bg: "#FEF3C7",
           },
           unverified: {
-            fg: "#334155",
+            fg: "#94A3B8",
             bg: "#F1F5F9",
           },
           blind_spot: {
-            fg: "#6B21A8",
-            bg: "#F3E8FF",
+            fg: "#0F172A",
+            bg: "#F1F5F9",
           },
           deprioritized: {
-            fg: "#374151",
-            bg: "#F3F4F6",
+            fg: "#CBD5E1",
+            bg: "#F1F5F9",
           },
         },
       },
@@ -109,6 +112,17 @@ export default {
         // Additive: keeps Tailwind's default sm/md/lg/xl/2xl, adds the
         // large-desktop breakpoint called out in the Milestone 0 brief.
         wide: "1440px",
+      },
+      keyframes: {
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        // Used via the `motion-safe:` variant so it's a no-op under
+        // prefers-reduced-motion without any extra JS.
+        "fade-up": "fade-up 400ms ease-out both",
       },
     },
   },

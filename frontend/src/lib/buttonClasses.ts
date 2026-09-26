@@ -28,7 +28,8 @@ export function buttonClasses(
 ): string {
   return cn(
     "inline-flex items-center justify-center gap-2 rounded-md font-medium",
-    "transition-colors duration-150 disabled:cursor-not-allowed",
+    "transition-[background-color,color,transform] duration-150 disabled:cursor-not-allowed",
+    "active:scale-[0.98]",
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],
     className

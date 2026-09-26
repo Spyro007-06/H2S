@@ -60,6 +60,57 @@ Running log of judgement calls, contract notes, stubs and audit results.
   existed only in the working tree, never committed — only `.gitkeep` files were tracked in
   git. Left uncommitted per this session's "only commit when asked" rule; flagged to the user.
 
+## Design Bible — verdict/skill color lock
+
+- The UNBLUFF UI Design Bible repeats (a third time, across the original brief, the
+  Milestone 0 prompt, and this document) an exact verdict/skill color set — e.g.
+  `defended: #059669` — calling it "CONTRACT-LOCKED" / "MUST remain unchanged". This
+  differs from `CONTRACT.md` §6, which darkens the same colors so they pass WCAG 4.5:1
+  as *text* (its own decision log says so explicitly).
+- Checked actual contrast ratios: `defended` #059669 (3.77:1), `shaky` #D97706 (3.00:1)
+  and `pending` #94A3B8 (2.56:1) all fail 4.5:1 as normal text on white; `bluff`,
+  `honest_gap` and `error` happen to pass. Colors aren't part of the wire contract
+  (the API returns the `Verdict`/`SkillState` enum strings, never a color), so this is
+  a pure frontend rendering choice, not an API compatibility question.
+- Resolution: treat the Design Bible's exact hex values as the real lock, but only for
+  the **icon fill + left-border/dot accent** (WCAG's non-text contrast rule needs 3:1,
+  which all six colors clear as icons/borders/large graphics). Label text always renders
+  in a neutral ink color (`textColor` in `styles/tokens.ts`) instead of the accent color,
+  so every badge stays legible regardless of which accent it carries. This preserves the
+  exact locked identity colors *and* keeps accessibility intact — "icon + label + color,
+  never color alone" is satisfied by construction. See `styles/tokens.ts`,
+  `tailwind.config.js` (`colors.verdict`/`colors.skill`), and `StatusBadge.tsx`.
+- `deprioritized`/"low priority" skill-state label and color now follow the Design
+  Bible (`#CBD5E1`, "Low priority") instead of `CONTRACT.md`'s "Not in role" / `#374151`,
+  for the same reason — display wording/color isn't part of the API contract.
+
+## Milestone 2 — Setup & Claim Extraction
+
+- **`prep_mode` is never sent to `POST /api/claims/extract`.** Checked
+  `backend/src/types.ts` directly: its `ExtractRequest` has only `role_id`,
+  `resume_text`, `declared_skills` — no mode field — and there is no
+  `server.ts`/routes yet, so the HTTP layer doesn't exist to receive one
+  either. The "Teach me" / "Challenge me" pasted note describing
+  `prep_mode` was a forward-looking learning-loop addendum, not something
+  the backend has implemented. The Setup UI still requires the user to pick
+  a mode (real product/UX requirement) and stores it in `SessionContext`
+  (`prepMode`, already part of the M0 state shape) for later milestones to
+  read locally; it is simply not part of the wire payload today. Cleaned up
+  `frontend/src/types/contract.ts` to match: removed `prep_mode` from
+  `ExtractRequest` and simplified `PreparationMode` to `"teach" | "challenge"`
+  (dropped the redundant `"teach_me"/"challenge_me"` variants nothing used).
+- **Role selection uses cards, not a searchable list.** `backend/data/roles/`
+  has exactly one role (`frontend_developer`); CONTRACT.md's own backend
+  notes confirm this is intentional for now. Cards are the simplest correct
+  choice per the M2 brief's own guidance ("if the list is small, use cards").
+- **`pdfjs-dist` is dynamically imported inside `usePdfExtractor`, not
+  imported at module scope.** The first build with a static import pulled
+  pdf.js into the main bundle (main JS jumped from ~211KB to ~704KB
+  gzip-uncompressed), meaning every visitor — including everyone who never
+  leaves the Landing page — paid for it. Lazy-loading it only when a PDF is
+  actually uploaded restored the main bundle to ~222KB; pdf.js now ships as
+  its own on-demand chunk.
+
 ## LLM failures
 
 - Assess mode: invalid output / timeout ends the claim with verdict `error` (restartable).
