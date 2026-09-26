@@ -104,8 +104,8 @@ export class GeminiProvider implements LLMProvider {
     return this.call("grade", gradePrompt(ctx), GradeOutput, this.precise);
   }
 
-  async fixTask({ role, claim, missingConcepts }: Parameters<LLMProvider["fixTask"]>[0]) {
-    return this.call("fixtask", fixTaskPrompt(role, claim, missingConcepts), FixTaskOutput, this.precise);
+  async fixTask({ role, claim, missingConcepts, rootCause }: Parameters<LLMProvider["fixTask"]>[0]) {
+    return this.call("fixtask", fixTaskPrompt(role, claim, missingConcepts, rootCause), FixTaskOutput, this.precise);
   }
 
   async rewrite({ claim, evidenceSummary }: Parameters<LLMProvider["rewrite"]>[0]) {

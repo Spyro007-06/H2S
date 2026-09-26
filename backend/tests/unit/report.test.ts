@@ -9,6 +9,7 @@ describe("buildReport", () => {
   const report = buildReport(
     {
       session_id: "s_1",
+      mode: "defense",
       resume_text: null,
       claims: [...example, claim("CL-008", "git", "defended", 1, { rewrite: "stale rewrite" })],
       history: [{ at: "t1", mode: "assess", claim_id: "CL-001", skill_id: "js_fundamentals", proficiency: 0.85 }],

@@ -10,6 +10,7 @@ import type {
   Report,
   Role,
   RoleSkill,
+  SessionMode,
   TurnResponse,
 } from "../types.js";
 import { ApiError } from "../errors.js";
@@ -27,6 +28,13 @@ import {
   vaguePoints,
 } from "../core/rules.js";
 import { blindSpots, progress, skillProficiency } from "../core/scoring.js";
+import {
+  forcedDueClaimId,
+  interleavedClaims,
+  onClaimCompleted,
+  retestBlockReason,
+  scheduleRetest,
+} from "../core/schedule.js";
 import {
   decideTurn,
   ERROR_SCORE,
@@ -50,6 +58,7 @@ export interface AssessmentDeps {
 
 export interface ExtractInput {
   role_id: string;
+  mode?: SessionMode;
   resume_text?: string | null;
   declared_skills?: string[];
 }
@@ -126,6 +135,7 @@ export class AssessmentService {
     const session: Session = {
       id: `s_${randomUUID()}`,
       role_id: role.id,
+      mode: input.mode ?? "defense",
       created_at: this.now().toISOString(),
       resume_text: resume,
       declared_skills: chips,
@@ -134,6 +144,8 @@ export class AssessmentService {
       cursors: {},
       history: [],
       guard_flips: 0,
+      completions: 0,
+      schedule: {},
     };
     await this.deps.store.save(session);
     return claimsResponse(session, role);
@@ -166,13 +178,16 @@ export class AssessmentService {
         } else {
           next.push(newClaim(existing.id, { ...fields, source: existing.source }));
           delete session.cursors[existing.id];
+          delete session.schedule[existing.id];
         }
       }
       // Drop cursors and history for removed claims.
       const kept = new Set(next.map((c) => c.id));
       for (const id of Object.keys(session.cursors)) if (!kept.has(id)) delete session.cursors[id];
+      for (const id of Object.keys(session.schedule)) if (!kept.has(id)) delete session.schedule[id];
       session.history = session.history.filter((h) => kept.has(h.claim_id));
       session.claims = next;
+      refreshSchedule(session);
       return claimsResponse(session, role);
     });
   }
@@ -212,7 +227,12 @@ export class AssessmentService {
       const allowed = mode === "assess" ? "pending or error" : "shaky, bluff or honest_gap";
       throw new ApiError("BAD_REQUEST", `Cannot ${mode} claim ${claim.id} with verdict "${claim.verdict}" (needs ${allowed})`);
     }
+    if (mode === "retest") {
+      const blocked = retestBlockReason(claim);
+      if (blocked) throw new ApiError("BAD_REQUEST", blocked);
+    }
     const level: Level = mode === "assess" ? 1 : retestStartLevel(claim.verdict, claim.levels_passed);
+    const interleaved = mode === "retest" ? interleavedClaims(session.schedule[claim.id], session.completions) : 0;
     if (mode === "assess") Object.assign(claim, newClaim(claim.id, claim), { qa: [] });
 
     const ctx: QuestionContext = { role, skill, claim, level, history: claim.qa };
@@ -224,13 +244,14 @@ export class AssessmentService {
           : await this.deps.llm.retestQuestion({
               ...ctx,
               missingConcepts: claim.missing_concepts.length > 0 ? claim.missing_concepts : levelCriteria(skill, level),
+              rootCause: claim.root_cause,
               previousQuestions: claim.qa.map((q) => q.question),
             });
     } catch (err) {
       return this.handleLlmFailure(session, claim, mode, err, null);
     }
     claim.qa.push(this.qa(level, mode === "retest" ? "retest" : "question", mode, question));
-    session.cursors[claim.id] = startCursor(mode, level);
+    session.cursors[claim.id] = startCursor(mode, level, interleaved);
     return turn(session, claim, mode, "question", level, question, null);
   }
 
@@ -251,7 +272,7 @@ export class AssessmentService {
     } catch (err) {
       return this.handleLlmFailure(session, claim, cursor.mode, err, null);
     }
-    const grade = finalizeGrade(raw, answer, cursor.level);
+    const grade = finalizeGrade(raw, answer, cursor.level, skill?.prerequisites ?? []);
     open.answer = answer;
     open.grade = grade;
     claim.evidence.push(...evidenceFromGrade(cursor.level, grade));
@@ -266,7 +287,8 @@ export class AssessmentService {
     const decision = decideTurn(cursor, grade);
     if (decision.turn === "done") {
       this.finishClaim(session, skill, claim, cursor, decision.outcome, grade);
-      return turn(session, claim, cursor.mode, "done", null, null, grade);
+      const teachNow = session.mode === "prepare" && isWeakVerdict(claim.verdict);
+      return turn(session, claim, cursor.mode, "done", null, null, grade, teachNow);
     }
 
     const next = decision.cursor;
@@ -279,6 +301,7 @@ export class AssessmentService {
         question = await this.deps.llm.retestQuestion({
           ...nextCtx,
           missingConcepts: levelCriteria(skill, next.level),
+          rootCause: null, // higher retest levels target that level's criteria
           previousQuestions: claim.qa.map((q) => q.question),
         });
       } else {
@@ -307,14 +330,18 @@ export class AssessmentService {
     if (cursor.mode === "assess") {
       Object.assign(claim, resolveAssess(outcome));
     } else {
-      const result = resolveRetest(claim, outcome);
-      Object.assign(claim, result);
+      Object.assign(claim, resolveRetest(claim, outcome, cursor.interleaved_claims));
+      claim.retest_status = "done";
+      claim.retest_unlocks_after = null;
+      delete session.schedule[claim.id];
     }
     claim.missing_concepts = missing;
+    claim.root_cause = failedLevel ? grade.root_cause : null;
     // Verdict/evidence changed: cached language outputs are stale.
     claim.fix_task = null;
     claim.rewrite = null;
     delete session.cursors[claim.id];
+    markCompleted(session, claim.id);
 
     if (claim.skill_id) {
       session.history.push({
@@ -343,6 +370,7 @@ export class AssessmentService {
     if (mode === "retest") throw new ApiError(err.code, "The AI examiner failed to respond. Please try again.");
     Object.assign(claim, ERROR_SCORE);
     delete session.cursors[claim.id];
+    markCompleted(session, claim.id);
     return turn(session, claim, mode, "done", null, null, grade);
   }
 
@@ -355,6 +383,13 @@ export class AssessmentService {
         throw new ApiError("BAD_REQUEST", `Fix tasks are only for shaky, bluff or honest_gap claims (${claim.id} is "${claim.verdict}")`);
       }
       if (!claim.fix_task) claim.fix_task = await this.callLlm(() => this.generateFixTask(role, claim));
+      // Opening the fix task schedules a delayed, interleaved retest.
+      const scheduled = scheduleRetest(claim, session.schedule, session.completions);
+      if (scheduled) {
+        Object.assign(claim, scheduled.patch);
+        session.schedule[claim.id] = scheduled.entry;
+        refreshSchedule(session);
+      }
       return claim.fix_task;
     });
   }
@@ -381,8 +416,8 @@ export class AssessmentService {
 
   private async generateFixTask(role: Role, claim: Claim): Promise<FixTask> {
     const concepts = claim.missing_concepts.length > 0 ? claim.missing_concepts : [claim.text];
-    const out = await this.deps.llm.fixTask({ role, claim, missingConcepts: concepts });
-    return { claim_id: claim.id, skill_id: claim.skill_id, missing_concepts: concepts, ...out };
+    const out = await this.deps.llm.fixTask({ role, claim, missingConcepts: concepts, rootCause: claim.root_cause });
+    return { claim_id: claim.id, skill_id: claim.skill_id, root_cause: claim.root_cause, missing_concepts: concepts, ...out };
   }
 
   // ---------- helpers ----------
@@ -427,6 +462,27 @@ export class AssessmentService {
 }
 
 // ---------- module helpers ----------
+
+/** A claim's assess/retest reached "done": count down other scheduled retests, then re-check rule 3. */
+function markCompleted(session: Session, claimId: string): void {
+  session.completions++;
+  const patches = onClaimCompleted(session.claims, claimId);
+  for (const c of session.claims) {
+    const patch = patches.get(c.id);
+    if (patch) Object.assign(c, patch);
+  }
+  refreshSchedule(session);
+}
+
+/** Rule 3: nothing pending or due but retests scheduled, so the oldest becomes due now. */
+function refreshSchedule(session: Session): void {
+  const id = forcedDueClaimId(session.claims, session.schedule);
+  const claim = id ? session.claims.find((c) => c.id === id) : undefined;
+  if (claim) {
+    claim.retest_status = "due";
+    claim.retest_unlocks_after = 0;
+  }
+}
 
 /** Report-time LLM calls in flight at once (protects per-minute quota for interrogation). */
 export const REPORT_LLM_CONCURRENCY = 2;
@@ -498,6 +554,7 @@ function claimsResponse(session: Session, role: Role): ClaimsResponse {
   return {
     session_id: session.id,
     role_id: role.id,
+    mode: session.mode,
     claims: session.claims,
     blind_spots: blindSpots(role, session.claims),
     progress: progress(session.claims),
@@ -512,7 +569,9 @@ function turn(
   level: Level | null,
   question: string | null,
   grade: TurnResponse["grade"],
+  teachNow = false,
 ): TurnResponse {
+  const prog = progress(session.claims);
   return {
     session_id: session.id,
     claim_id: claim.id,
@@ -522,6 +581,8 @@ function turn(
     question,
     grade,
     claim,
-    progress: progress(session.claims),
+    progress: prog,
+    next_mode: prog.next_mode,
+    teach_now: teachNow,
   };
 }

@@ -60,6 +60,8 @@ backend code decides pass/fail, verdicts, proficiency, readiness, coverage and p
 | `TurnType` | `question` `clarify` `done` |
 | `QuestionKind` | `question` `clarify` `retest` |
 | `LlmMode` | `live` `mock` |
+| `SessionMode` *(added)* | `prepare` `defense` |
+| `RetestStatus` *(added)* | `none` `scheduled` `due` `done` |
 
 `deprioritized` is never used in `Report.skills`; it describes claims whose `skill_id` is `null`
 (listed in `Report.deprioritized_claim_ids`).
@@ -80,6 +82,8 @@ export type Mode = "assess" | "retest";
 export type TurnType = "question" | "clarify" | "done";
 export type QuestionKind = "question" | "clarify" | "retest";
 export type LlmMode = "live" | "mock";
+export type SessionMode = "prepare" | "defense"; // added (learning loop)
+export type RetestStatus = "none" | "scheduled" | "due" | "done"; // added (learning loop)
 export type ErrorCode =
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -105,6 +109,7 @@ export interface RoleSkill {
   description: string;
   keywords: string[];
   levels: LevelCriteria;
+  prerequisites: string[]; // added: 3–5 concepts, most fundamental first
 }
 
 export interface Role {
@@ -134,6 +139,7 @@ export interface Grade {
   needs_clarification: boolean;
   level_passed: boolean; // computed by backend code, never by the LLM
   guard_flips: Criterion[]; // criteria forced to false because the quote was not in the answer
+  root_cause: string | null; // added: one of the skill's prerequisites (validated in code) or null
 }
 
 // ---------- Claims ----------
@@ -159,11 +165,13 @@ export interface RetestResult {
   passed: boolean; // after > before
   before: number;
   after: number;
+  interleaved_claims: number; // added: other claims completed between the fix task and the retest start
 }
 
 export interface FixTask {
   claim_id: string;
   skill_id: string | null;
+  root_cause: string | null; // added: the prerequisite the task targets first, if diagnosed
   missing_concepts: string[];
   explanation: string; // markdown, <= 120 words
   exercise: string; // markdown
@@ -184,6 +192,9 @@ export interface Claim {
   retest: RetestResult | null;
   fix_task: FixTask | null;
   rewrite: string | null; // honest resume rewrite, only for shaky/bluff/honest_gap
+  root_cause: string | null; // added: root cause from the failing level (null if none / passed)
+  retest_status: RetestStatus; // added
+  retest_unlocks_after: number | null; // added: other claims still to finish before the retest is due
 }
 
 export interface ClaimInput {
@@ -202,7 +213,8 @@ export interface BlindSpot {
 export interface Progress {
   claims_total: number;
   claims_done: number; // claims whose verdict is not "pending"
-  next_claim_id: string | null; // first "pending" claim in list order
+  next_claim_id: string | null; // first due retest, else first "pending" claim, else null (see §5)
+  next_mode: Mode | null; // added: what to do with next_claim_id
 }
 
 // ---------- Report ----------
@@ -248,6 +260,7 @@ export interface PlanItem {
 
 export interface Report {
   session_id: string;
+  mode: SessionMode; // added
   role: { id: string; name: string };
   generated_at: string;
   readiness: number; // 0..100
@@ -275,6 +288,7 @@ export interface RolesResponse {
 
 export interface ExtractRequest {
   role_id: string;
+  mode?: SessionMode; // added, default "defense"
   resume_text?: string | null; // <= 20000 chars
   declared_skills?: string[]; // <= 20 chips, each <= 60 chars
 }
@@ -282,6 +296,7 @@ export interface ExtractRequest {
 export interface ClaimsResponse {
   session_id: string;
   role_id: string;
+  mode: SessionMode; // added
   claims: Claim[];
   blind_spots: BlindSpot[];
   progress: Progress;
@@ -309,6 +324,8 @@ export interface TurnResponse {
   grade: Grade | null; // grade of the answer just submitted; null on start
   claim: Claim;
   progress: Progress;
+  next_mode: Mode | null; // added: same as progress.next_mode
+  teach_now: boolean; // added: prepare mode and this turn finished the claim as shaky/bluff/honest_gap
 }
 
 export interface FixTaskRequest {
@@ -338,6 +355,7 @@ export interface ApiErrorBody {
 | GET | `/api/demo/report` | — | `Report` (the §7 mock, verbatim) |
 
 ### `POST /api/claims/extract`
+- *(added)* Optional `mode`: `"prepare"` (teach as you go) or `"defense"` (default, interview simulation). Stored on the session and echoed as `ClaimsResponse.mode` / `Report.mode`.
 - At least one of `resume_text` (non-blank) or `declared_skills` (non-empty) is required → else 400.
 - Max 8 claims. Resume claims come first, then one claim per declared chip (`source: "declared"`,
   `text: "Knows <chip>"`, `resume_line: null`).
@@ -353,7 +371,7 @@ One endpoint drives both assessment and retest.
 
 | Request | Behaviour |
 |---|---|
-| no `answer`, claim idle | Starts the claim. `mode: "assess"` requires verdict `pending` or `error`. `mode: "retest"` requires `shaky`, `bluff` or `honest_gap`. Else 400. Returns `turn: "question"`. |
+| no `answer`, claim idle | Starts the claim. `mode: "assess"` requires verdict `pending` or `error`. `mode: "retest"` requires `shaky`, `bluff` or `honest_gap` **and** `retest_status: "due"` (see Learning loop). Else 400. Returns `turn: "question"`. |
 | no `answer`, claim in progress | Returns the current open question again (safe to call on page reload). |
 | `answer`, claim in progress | Grades the answer and returns the next turn. |
 | `answer`, claim idle | 400. |
@@ -387,6 +405,38 @@ and on `done` sets `claim.retest`. A failed retest keeps the old verdict and nev
 
 ### `POST /api/fix-task`
 Only for `shaky`, `bluff`, `honest_gap` claims (else 400). Result is cached on `claim.fix_task`.
+*(added)* The task targets `root_cause` first when one was diagnosed, and fetching it **schedules the retest**
+(`retest_status: "scheduled"`, `retest_unlocks_after: 2`) unless it is already scheduled or due.
+
+### Learning loop *(added)*
+
+**Root cause.** Each role skill lists `prerequisites` (most fundamental first). GRADE also returns
+`root_cause`, and code keeps it only if it is exactly one of those prerequisites (else `null`, and
+always `null` on a passed level). `Claim.root_cause` is the root cause of the failing level. It costs
+no extra LLM call.
+
+**Delayed, interleaved retest.**
+
+| Event | Effect |
+|---|---|
+| `POST /api/fix-task` on a weak claim | `retest_status: "scheduled"`, `retest_unlocks_after: 2` |
+| Another claim's assess or retest reaches `turn: "done"` | every scheduled claim: `retest_unlocks_after − 1`; at 0 → `"due"` |
+| No pending claims left, nothing due, some scheduled | the oldest scheduled one is forced `"due"` |
+| Retest reaches `done` | `retest_status: "done"`, `retest_unlocks_after: null` |
+| Retest start while not due | 400 `BAD_REQUEST`, message `Retest unlocks after N more concepts` |
+
+`RetestResult.interleaved_claims` is the real number of other claims completed between opening the fix
+task and starting the retest (0 when forced due early). Retest questions are fresh scenarios on
+`root_cause` (else `missing_concepts`), never a repeat of the claim's earlier questions.
+
+**What next.** `Progress.next_claim_id` / `next_mode` (also `TurnResponse.next_mode`): (1) first due retest →
+`"retest"`, (2) first pending claim → `"assess"`, (3) the forced-due case above → `"retest"`, (4) `null`.
+
+**teach_now.** `true` only in `prepare` mode on the `done` turn that leaves the claim `shaky`, `bluff` or
+`honest_gap`. The UI should then show the fix task immediately. Always `false` in `defense` mode.
+
+**L3 focus.** L3 questions ask why this approach, **when they would NOT use it**, and to defend the
+decision against a concrete alternative.
 
 ### `GET /api/report/:sessionId`
 Builds the report. Rewrites and fix tasks for weak claims are generated once and cached, so
@@ -395,7 +445,7 @@ refetching is cheap. Can be called at any time (unassessed claims are `pending`)
 - `readiness = round(100 × Σ weight × skill proficiency)`, skill proficiency = max over its claims.
 - `coverage = round(100 × Σ weight of skills with ≥1 claim whose verdict is not pending/error)`.
 - Skill `state`: `blind_spot` (no claims) → `unverified` (all pending/error) → `ready` (≥ 0.6) → `needs_work`.
-- `priorities`: top 3 skills by `weight × (1 − proficiency)`, ties by weight then role order.
+- `priorities`: top 3 skills by `weight × (1 − proficiency)`, ties by weight then role order. *(added)* `reason` ends with `(root cause: X)` when the weakest claim has one.
 - `plan`: one item per priority, then remaining shaky/bluff/honest_gap claims; days 1..7, 2 per day.
 - `resume_lines`: worst verdict per line, severity `bluff > shaky > honest_gap > error > pending > defended`.
 
@@ -433,6 +483,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
 ```json
 {
   "session_id": "s_demo",
+  "mode": "prepare",
   "role": {
     "id": "frontend_developer",
     "name": "Frontend Developer"
@@ -542,7 +593,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:00:46.000Z"
         },
@@ -583,7 +635,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "Reconciliation"
           },
           "asked_at": "2026-09-26T09:01:09.000Z"
         }
@@ -592,6 +645,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "fix_task": {
         "claim_id": "CL-001",
         "skill_id": "react_state",
+        "root_cause": "Reconciliation",
         "missing_concepts": [
           "Reconciliation: the new element tree is diffed against the previous one; the virtual DOM is not a cache",
           "How useSelector subscribes to the store and triggers a re-render when the selected value changes"
@@ -599,7 +653,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
         "explanation": "The virtual DOM is **not a cache**. On `dispatch`, Redux runs the reducer and notifies subscribers; each `useSelector` re-runs its selector and compares the result with `===`. If it changed, that component **re-renders**: React calls it again, builds a new element tree, **diffs** it against the previous one (reconciliation, matching list rows by `key`) and **commits** only the changed DOM nodes. Hooks don't make anything faster; they're how components subscribe.",
         "exercise": "Build a 50-row product table with a Redux filter. Add `console.count` in each row and use React DevTools \"Highlight updates\". Change the filter and explain which components re-rendered and why. Then memoize the row and select only what it needs.\n\n**Done when** changing the filter re-renders only the table and the rows whose data changed."
       },
-      "rewrite": "Built React + Redux Toolkit product and cart slices for a 10k-item dashboard (learning render/reconciliation internals)"
+      "rewrite": "Built React + Redux Toolkit product and cart slices for a 10k-item dashboard (learning render/reconciliation internals)",
+      "root_cause": "Reconciliation",
+      "retest_status": "scheduled",
+      "retest_unlocks_after": 2
     },
     {
       "id": "CL-002",
@@ -741,7 +798,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:01:55.000Z"
         },
@@ -782,7 +840,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:02:18.000Z"
         },
@@ -823,14 +882,18 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:02:41.000Z"
         }
       ],
       "retest": null,
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-003",
@@ -984,7 +1047,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:03:27.000Z"
         },
@@ -1025,7 +1089,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:03:50.000Z"
         },
@@ -1066,7 +1131,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "CSS Grid tracks & fr"
           },
           "asked_at": "2026-09-26T09:04:13.000Z"
         },
@@ -1107,19 +1173,24 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:08:49.000Z"
+          "asked_at": "2026-09-26T09:06:54.000Z"
         }
       ],
       "retest": {
         "attempted": true,
         "passed": true,
         "before": 0.6,
-        "after": 1
+        "after": 1,
+        "interleaved_claims": 2
       },
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "done",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-004",
@@ -1186,7 +1257,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "What coverage measures"
           },
           "asked_at": "2026-09-26T09:04:59.000Z"
         }
@@ -1195,6 +1267,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "fix_task": {
         "claim_id": "CL-004",
         "skill_id": "testing",
+        "root_cause": "What coverage measures",
         "missing_concepts": [
           "What line/branch coverage measures and what it doesn't",
           "Tests you personally wrote and what they asserted"
@@ -1202,7 +1275,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
         "explanation": "Coverage counts which **lines and branches ran** during tests, not whether behaviour is correct. A test isolates a unit by **rendering** it (e.g. Testing Library), **mocking** its dependencies such as `fetch`, and **asserting** on what the user sees. Owning a test means you can say what it asserts and which bug it would catch.",
         "exercise": "Write 3 Vitest + Testing Library tests for a `<CartSummary>` component: empty cart, one item, and a failed price fetch (mock `fetch` to reject). Run coverage and find one covered line whose bug your tests would *not* catch.\n\n**Done when** all 3 pass and you can name that uncaught bug."
       },
-      "rewrite": "Ran and maintained an existing Jest test suite (80% template coverage); writing my own component tests"
+      "rewrite": "Ran and maintained an existing Jest test suite (80% template coverage); writing my own component tests",
+      "root_cause": "What coverage measures",
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-005",
@@ -1287,7 +1363,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:05:45.000Z"
         },
@@ -1328,7 +1405,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": true,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:06:08.000Z"
         }
@@ -1337,6 +1415,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "fix_task": {
         "claim_id": "CL-005",
         "skill_id": "git",
+        "root_cause": null,
         "missing_concepts": [
           "Explains what a commit is (snapshot + parent pointer) and how a merge or rebase combines histories",
           "Explains how a merge conflict arises and the steps to resolve it"
@@ -1344,7 +1423,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
         "explanation": "A commit is a **snapshot plus a pointer to its parent(s)**. To merge, Git finds the **merge base** (common ancestor) and does a 3-way comparison: base vs yours vs theirs. If both sides changed the **same lines** differently, Git can't choose and writes conflict markers `<<<<<<<`, `=======`, `>>>>>>>`.",
         "exercise": "In a scratch repo, create `main` and `feature`, edit the same line of `package.json` differently on each, then merge. Run `git merge-base main feature` and `git show :1:package.json` / `:2:` / `:3:` to see base, ours and theirs.\n\n**Done when** you can explain the conflict using those three versions."
       },
-      "rewrite": "Used feature branches and pull requests in a 4-person team; reviewed PRs and resolved merge conflicts"
+      "rewrite": "Used feature branches and pull requests in a 4-person team; reviewed PRs and resolved merge conflicts",
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-006",
@@ -1471,9 +1553,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": true,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:06:54.000Z"
+          "asked_at": "2026-09-26T09:07:40.000Z"
         },
         {
           "level": 1,
@@ -1512,9 +1595,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:07:17.000Z"
+          "asked_at": "2026-09-26T09:08:03.000Z"
         },
         {
           "level": 2,
@@ -1553,9 +1637,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:07:40.000Z"
+          "asked_at": "2026-09-26T09:08:26.000Z"
         },
         {
           "level": 3,
@@ -1594,15 +1679,17 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "ES modules & dynamic import"
           },
-          "asked_at": "2026-09-26T09:08:03.000Z"
+          "asked_at": "2026-09-26T09:08:49.000Z"
         }
       ],
       "retest": null,
       "fix_task": {
         "claim_id": "CL-006",
         "skill_id": "js_fundamentals",
+        "root_cause": "ES modules & dynamic import",
         "missing_concepts": [
           "Route vs component splitting: chunk count, waterfalls and cache reuse",
           "A real cost of code splitting, such as loading waterfalls or a spinner flash on navigation"
@@ -1610,7 +1697,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
         "explanation": "**Route-level** splitting gives few, large chunks that cache well and load once per page. **Component-level** splitting gives many small chunks but can create **waterfalls** (a chunk that imports another chunk) and spinner flashes during navigation. Mitigations are **prefetching** on hover or idle and grouping libraries shared by several routes.",
         "exercise": "In a Vite app, lazy-load two routes that share a chart library. Build with `vite build` and inspect the chunk list. Then add `import()` prefetch on link hover and compare the Network waterfall.\n\n**Done when** you can show the chunk graph and explain one waterfall you removed."
       },
-      "rewrite": "Cut main bundle from 1.1 MB to 640 kB with route-level React.lazy code splitting (LCP 4.2s → 2.5s)"
+      "rewrite": "Cut main bundle from 1.1 MB to 640 kB with route-level React.lazy code splitting (LCP 4.2s → 2.5s)",
+      "root_cause": "ES modules & dynamic import",
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-007",
@@ -1626,7 +1716,10 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "qa": [],
       "retest": null,
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     }
   ],
   "skills": [
@@ -1641,7 +1734,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       ],
       "history": [
         {
-          "at": "2026-09-26T09:08:26.000Z",
+          "at": "2026-09-26T09:09:12.000Z",
           "mode": "assess",
           "claim_id": "CL-006",
           "proficiency": 0.6
@@ -1701,7 +1794,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
           "proficiency": 0.6
         },
         {
-          "at": "2026-09-26T09:09:12.000Z",
+          "at": "2026-09-26T09:07:17.000Z",
           "mode": "retest",
           "claim_id": "CL-003",
           "proficiency": 1
@@ -1834,7 +1927,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "skill_id": "react_state",
       "claim_id": "CL-001",
       "score": 0.15,
-      "reason": "20% role weight, failed at L2"
+      "reason": "20% role weight, failed at L2 (root cause: Reconciliation)"
     },
     {
       "rank": 2,
@@ -1848,7 +1941,7 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
       "skill_id": "testing",
       "claim_id": "CL-004",
       "score": 0.1,
-      "reason": "10% role weight, failed at L1"
+      "reason": "10% role weight, failed at L1 (root cause: What coverage measures)"
     }
   ],
   "plan": [
@@ -1891,7 +1984,8 @@ Resume heatmap line with `verdict: null` → no highlight, label "No claim".
   "progress": {
     "claims_total": 7,
     "claims_done": 6,
-    "next_claim_id": "CL-007"
+    "next_claim_id": "CL-007",
+    "next_mode": "assess"
   }
 }
 ```

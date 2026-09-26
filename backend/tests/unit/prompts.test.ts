@@ -51,15 +51,18 @@ describe("prompts carry the required context", () => {
   });
 
   it("RETEST names missing concepts and forbids previous questions", () => {
-    const p = retestPrompt({ ...ctx, missingConcepts: ["reconciliation"], previousQuestions: ["What did you build?"] });
+    const p = retestPrompt({ ...ctx, missingConcepts: ["reconciliation"], rootCause: null, previousQuestions: ["What did you build?"] });
     expect(p).toContain("- reconciliation");
     expect(p).toContain("Do NOT repeat or paraphrase");
     expect(p).toContain("- What did you build?");
-    expect(retestPrompt({ ...ctx, missingConcepts: ["x"], previousQuestions: [] })).toContain("- (none)");
+    expect(retestPrompt({ ...ctx, missingConcepts: ["x"], rootCause: null, previousQuestions: [] })).toContain("- (none)");
+    const rooted = retestPrompt({ ...ctx, missingConcepts: ["keys"], rootCause: "Reconciliation", previousQuestions: [] });
+    expect(rooted).toContain('root-cause prerequisite "Reconciliation"');
   });
 
   it("FIXTASK and REWRITE are grounded in missing concepts / evidence", () => {
-    expect(fixTaskPrompt(role, claim, ["keys in lists"])).toContain("- keys in lists");
+    expect(fixTaskPrompt(role, claim, ["keys in lists"], null)).toContain("- keys in lists");
+    expect(fixTaskPrompt(role, claim, ["keys in lists"], "Reconciliation")).toContain('prerequisite "Reconciliation". Teach that FIRST');
     const r = rewritePrompt(claim, "Levels passed: 1 of 3.");
     expect(r).toContain("Built a React dashboard with Redux");
     expect(r).toContain("Levels passed: 1 of 3.");
@@ -90,8 +93,8 @@ describe("config", () => {
 
 describe("MemoryStore", () => {
   const session = (id: string): Session => ({
-    id, role_id: "frontend_developer", created_at: "t", resume_text: null, declared_skills: [],
-    claims: [], next_seq: 1, cursors: {}, history: [], guard_flips: 0,
+    id, role_id: "frontend_developer", mode: "defense", created_at: "t", resume_text: null, declared_skills: [],
+    claims: [], next_seq: 1, cursors: {}, history: [], guard_flips: 0, completions: 0, schedule: {},
   });
 
   it("returns copies, not live references", async () => {

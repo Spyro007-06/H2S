@@ -110,14 +110,18 @@ describe("resolveRetest", () => {
       verdict: "defended",
       levels_passed: 3,
       proficiency: 1,
-      retest: { attempted: true, passed: true, before: 0.25, after: 1 },
+      retest: { attempted: true, passed: true, before: 0.25, after: 1, interleaved_claims: 0 },
     });
+  });
+
+  it("records the interleaving gap it is given", () => {
+    expect(resolveRetest(shaky, { kind: "passed_all" }, 3).retest.interleaved_claims).toBe(3);
   });
 
   it("partial improvement raises proficiency but keeps the verdict", () => {
     const r = resolveRetest(shaky, { kind: "failed", level: 3 });
     expect(r.verdict).toBe("shaky");
-    expect(r.retest).toEqual({ attempted: true, passed: true, before: 0.25, after: 0.6 });
+    expect(r.retest).toEqual({ attempted: true, passed: true, before: 0.25, after: 0.6, interleaved_claims: 0 });
   });
 
   it("failing again never lowers proficiency", () => {

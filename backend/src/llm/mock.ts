@@ -38,18 +38,20 @@ export class MockProvider implements LLMProvider {
     return `(L${level} follow-up on "${claim.text}") Be concrete: ${target}?`;
   }
 
-  async retestQuestion({ claim, level, missingConcepts }: Parameters<LLMProvider["retestQuestion"]>[0]) {
-    const topic = missingConcepts[0] ?? claim.text;
+  async retestQuestion({ claim, level, missingConcepts, rootCause }: Parameters<LLMProvider["retestQuestion"]>[0]) {
+    const topic = rootCause ?? missingConcepts[0] ?? claim.text;
     return `Scenario (L${level}): a teammate's version of "${claim.text}" breaks in production. Using ${topic}, how would you debug and fix it?`;
   }
 
   async grade({ answer, skill, level }: Parameters<LLMProvider["grade"]>[0]): Promise<RawGrade> {
     const concept = levelCriteria(skill, level)[0] ?? null;
+    const rootCause = skill?.prerequisites[0] ?? null; // deterministic: most fundamental prerequisite
     if (/i don'?t know/i.test(answer)) {
       return {
         criteria: allCriteria(() => ({ passed: false, evidence_quote: null, missing_concept: concept })),
         admits_gap: true,
         needs_clarification: false,
+        root_cause: rootCause,
       };
     }
     if (answer.trim().length < SHORT_ANSWER_CHARS) {
@@ -62,6 +64,7 @@ export class MockProvider implements LLMProvider {
         ),
         admits_gap: false,
         needs_clarification: false,
+        root_cause: rootCause,
       };
     }
     const quote = answer.trim().split(/\s+/).slice(0, 8).join(" ");
@@ -69,14 +72,16 @@ export class MockProvider implements LLMProvider {
       criteria: allCriteria(() => ({ passed: true, evidence_quote: quote, missing_concept: null })),
       admits_gap: false,
       needs_clarification: false,
+      root_cause: null,
     };
   }
 
-  async fixTask({ claim, missingConcepts }: Parameters<LLMProvider["fixTask"]>[0]) {
+  async fixTask({ claim, missingConcepts, rootCause }: Parameters<LLMProvider["fixTask"]>[0]) {
     const concepts = missingConcepts.length > 0 ? missingConcepts : [claim.text];
+    const root = rootCause ? `Start with the root cause, **${rootCause}**. ` : "";
     return {
-      explanation: `You could not yet show: **${concepts.join("; ")}**. Review how this works in the context of "${claim.text}" and be ready to explain it step by step.`,
-      exercise: `Build a 30-line example that demonstrates ${concepts[0]}, then explain each step in writing as if to an interviewer.`,
+      explanation: `${root}You could not yet show: **${concepts.join("; ")}**. Review how this works in the context of "${claim.text}" and be ready to explain it step by step.`,
+      exercise: `Build a 30-line example that demonstrates ${rootCause ?? concepts[0]}, then explain each step in writing as if to an interviewer.`,
     };
   }
 

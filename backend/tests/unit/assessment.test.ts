@@ -28,7 +28,8 @@ describe("AssessmentService ladder", () => {
     const done = await svc.interrogate({ session_id: sid, claim_id: "CL-001", answer: GOOD });
     expect(done).toMatchObject({ turn: "done", level: null, question: null });
     expect(done.claim).toMatchObject({ verdict: "defended", levels_passed: 3, proficiency: 0.85 });
-    expect(done.progress).toEqual({ claims_total: 1, claims_done: 1, next_claim_id: null });
+    expect(done.progress).toEqual({ claims_total: 1, claims_done: 1, next_claim_id: null, next_mode: null });
+    expect(done.teach_now).toBe(false);
   });
 
   it("6. invalid LLM output → verdict error, excluded from coverage, restartable", async () => {
@@ -56,6 +57,9 @@ describe("AssessmentService ladder", () => {
     const shaky = await svc.interrogate({ session_id: sid, claim_id: "CL-001", answer: GOOD });
     expect(shaky.claim).toMatchObject({ verdict: "shaky", levels_passed: 1, proficiency: 0.25, missing_concepts: ["missing mechanism"] });
 
+    // Opening the fix task schedules the retest; with nothing else pending it is forced due (rule 3).
+    const fix = await svc.fixTask(sid, "CL-001");
+    expect(fix.root_cause).toBeNull(); // scripted grades carry no root cause
     const r1 = await svc.interrogate({ session_id: sid, claim_id: "CL-001", mode: "retest" });
     expect(r1).toMatchObject({ mode: "retest", turn: "question", level: 2 });
     expect(r1.question).toContain("missing mechanism");
@@ -67,7 +71,8 @@ describe("AssessmentService ladder", () => {
     expect(done.claim).toMatchObject({
       verdict: "defended",
       proficiency: 1,
-      retest: { attempted: true, passed: true, before: 0.25, after: 1 },
+      retest: { attempted: true, passed: true, before: 0.25, after: 1, interleaved_claims: 0 },
+      retest_status: "done",
     });
 
     const report = await svc.report(sid);

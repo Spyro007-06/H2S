@@ -7,6 +7,7 @@ const id = (label: string) => z.string({ error: `${label} is required` }).trim()
 export const ExtractRequestSchema = z
   .strictObject({
     role_id: id("role_id"),
+    mode: z.enum(["prepare", "defense"], { error: "mode must be \"prepare\" or \"defense\"" }).optional(),
     resume_text: z.string().max(20_000, "resume_text must be at most 20000 characters").nullish(),
     declared_skills: z
       .array(z.string().trim().min(1, "declared skills cannot be empty").max(60, "each declared skill must be at most 60 characters"))

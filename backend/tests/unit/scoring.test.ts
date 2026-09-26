@@ -56,7 +56,7 @@ describe("skill proficiency and state", () => {
 describe("progress", () => {
   it("counts non-pending claims and finds the next pending one", () => {
     const cs = [claim("CL-001", "git", "defended", 0.85), claim("CL-002", "git", "pending", 0), claim("CL-003", "git", "error", 0)];
-    expect(progress(cs)).toEqual({ claims_total: 3, claims_done: 2, next_claim_id: "CL-002" });
+    expect(progress(cs)).toEqual({ claims_total: 3, claims_done: 2, next_claim_id: "CL-002", next_mode: "assess" });
     expect(progress([]).next_claim_id).toBeNull();
   });
 });

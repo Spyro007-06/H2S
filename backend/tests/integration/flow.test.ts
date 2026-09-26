@@ -59,7 +59,7 @@ describe("full flow over HTTP (mock mode)", () => {
       }
       expect(last?.turn).toBe("done");
     }
-    expect(last?.progress).toEqual({ claims_total: 7, claims_done: 7, next_claim_id: null });
+    expect(last?.progress).toEqual({ claims_total: 7, claims_done: 7, next_claim_id: null, next_mode: null });
 
     const reportRes = await request(app).get(`/api/report/${sid}`).expect(200);
     const report: Report = ReportSchema.parse(reportRes.body);
@@ -84,7 +84,11 @@ describe("full flow over HTTP (mock mode)", () => {
     expect(r1.body).toMatchObject({ mode: "retest", turn: "question", level: 2 });
     await request(app).post("/api/interrogate").send({ session_id: sid, claim_id: "CL-002", answer: GOOD }).expect(200);
     const r3 = await request(app).post("/api/interrogate").send({ session_id: sid, claim_id: "CL-002", answer: GOOD }).expect(200);
-    expect(r3.body.claim).toMatchObject({ verdict: "defended", retest: { attempted: true, passed: true, before: 0.25, after: 1 } });
+    expect(r3.body.claim).toMatchObject({
+      verdict: "defended",
+      retest_status: "done",
+      retest: { attempted: true, passed: true, before: 0.25, after: 1, interleaved_claims: 0 }, // forced due: honest 0
+    });
 
     const after = ReportSchema.parse((await request(app).get(`/api/report/${sid}`).expect(200)).body);
     expect(after.readiness).toBeGreaterThan(report.readiness);

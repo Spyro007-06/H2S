@@ -46,6 +46,7 @@ interface Step {
   missing?: Partial<Record<Criterion, string>>;
   gap?: boolean;
   vague?: boolean;
+  rootCause?: string; // must be one of the skill's prerequisites (validated by core)
 }
 
 /** Scripted interview per claim text; each step is one question → answer → grade. */
@@ -75,6 +76,7 @@ const SCRIPT: Record<string, Step[]> = {
         accuracy: "Reconciliation: the new element tree is diffed against the previous one; the virtual DOM is not a cache",
         mechanism: "How useSelector subscribes to the store and triggers a re-render when the selected value changes",
       },
+      rootCause: "Reconciliation",
     },
   ],
   [CLAIMS[1]!.text]: [
@@ -144,6 +146,7 @@ const SCRIPT: Record<string, Step[]> = {
         accuracy: "Grid aligns items in two dimensions; flex-wrap leaves an uneven last row",
         tradeoff: "Concrete trade-off between Grid and flex-wrap for card lists, and a real layout bug",
       },
+      rootCause: "CSS Grid tracks & fr",
     },
   ],
   [CLAIMS[3]!.text]: [
@@ -156,6 +159,7 @@ const SCRIPT: Record<string, Step[]> = {
         accuracy: "What line/branch coverage measures and what it doesn't",
         ownership: "Tests you personally wrote and what they asserted",
       },
+      rootCause: "What coverage measures",
     },
   ],
   [CLAIMS[4]!.text]: [
@@ -221,6 +225,7 @@ const SCRIPT: Record<string, Step[]> = {
         accuracy: "Route vs component splitting: chunk count, waterfalls and cache reuse",
         tradeoff: "A real cost of code splitting, such as loading waterfalls or a spinner flash on navigation",
       },
+      rootCause: "ES modules & dynamic import",
     },
   ],
 };
@@ -239,6 +244,12 @@ const RETEST: Step = {
 };
 
 const FIX: Record<string, { explanation: string; exercise: string }> = {
+  responsive_css: {
+    explanation:
+      "Root cause: **CSS Grid tracks & fr**. `repeat(auto-fill, minmax(220px, 1fr))` creates equal-width **tracks**: every card in every row, including a half-empty last row, gets the same column width. `flex-wrap` has no columns: each row distributes its own free space, so with `flex: 1 1 220px` the orphan cards in the last row **stretch** wider than the rest. Use Grid when you need two-dimensional alignment and Flexbox for one-dimensional rows such as toolbars. Avoid Grid when item widths must follow their content.",
+    exercise:
+      "Build the same 7-card list twice: once with Grid `repeat(auto-fill, minmax(220px, 1fr))` and once with `display:flex; flex-wrap:wrap` and `flex: 1 1 220px`. Resize from 1200px to 280px and screenshot where they differ. Then fix the 280px overflow with `minmax(min(220px, 100%), 1fr)`.\n\n**Done when** you can explain the last-row difference and the overflow fix in two sentences each.",
+  },
   react_state: {
     explanation:
       "The virtual DOM is **not a cache**. On `dispatch`, Redux runs the reducer and notifies subscribers; each `useSelector` re-runs its selector and compares the result with `===`. If it changed, that component **re-renders**: React calls it again, builds a new element tree, **diffs** it against the previous one (reconciliation, matching list rows by `key`) and **commits** only the changed DOM nodes. Hooks don't make anything faster; they're how components subscribe.",
@@ -280,7 +291,7 @@ function grade(step: Step): RawGrade {
       { passed: pass.includes(n), evidence_quote: step.quotes[n] ?? null, missing_concept: pass.includes(n) ? null : (step.missing?.[n] ?? null) },
     ]),
   ) as Record<Criterion, CriterionResult>;
-  return { criteria, admits_gap: step.gap ?? false, needs_clarification: step.vague ?? false };
+  return { criteria, admits_gap: step.gap ?? false, needs_clarification: step.vague ?? false, root_cause: step.rootCause ?? null };
 }
 
 /** Language layer that replays the script. All decisions still happen in core. */
@@ -331,17 +342,29 @@ export async function buildDemoReport() {
     now: () => new Date((t += 23_000)),
   });
 
-  const { session_id: sid, claims } = await svc.extract({ role_id: "frontend_developer", resume_text: DEMO_RESUME });
+  const { session_id: sid, claims } = await svc.extract({
+    role_id: "frontend_developer",
+    resume_text: DEMO_RESUME,
+    mode: "prepare",
+  });
+  const css = claims.find((c) => c.skill_id === "responsive_css")!;
+  const react = claims.find((c) => c.skill_id === "react_state")!;
   for (const claim of claims.filter((c) => c.skill_id !== null)) {
     let res = await svc.interrogate({ session_id: sid, claim_id: claim.id });
     for (const step of SCRIPT[claim.text] ?? []) {
       if (res.turn === "done") break;
       res = await svc.interrogate({ session_id: sid, claim_id: claim.id, answer: step.answer });
     }
+    // Prepare mode: teach_now after the CSS claim ends shaky, so the student opens its fix task.
+    if (claim.id === css.id && res.teach_now) await svc.fixTask(sid, css.id);
+    // A due retest takes priority over the next pending claim (after 2 interleaved claims).
+    if (res.next_mode === "retest" && res.progress.next_claim_id === css.id) {
+      await svc.interrogate({ session_id: sid, claim_id: css.id, mode: "retest" });
+      await svc.interrogate({ session_id: sid, claim_id: css.id, answer: RETEST.answer });
+    }
   }
-  const css = claims.find((c) => c.skill_id === "responsive_css")!;
-  await svc.interrogate({ session_id: sid, claim_id: css.id, mode: "retest" });
-  await svc.interrogate({ session_id: sid, claim_id: css.id, answer: RETEST.answer });
+  // Fix task opened for the React claim; CL-007 is still pending, so its retest stays scheduled.
+  await svc.fixTask(sid, react.id);
 
   const report = await svc.report(sid);
   return { ...report, session_id: "s_demo" };
@@ -367,6 +390,12 @@ async function main() {
     `readiness=${report.readiness} coverage=${report.coverage} claims=${report.claims.length} ` +
       `verdicts=${report.claims.map((c) => `${c.id}:${c.verdict}`).join(",")}`,
   );
+  for (const c of report.claims) {
+    console.log(
+      `  ${c.id} root_cause=${c.root_cause ?? "-"} retest_status=${c.retest_status} unlocks_after=${c.retest_unlocks_after ?? "-"}` +
+        (c.retest ? ` retest=${JSON.stringify(c.retest)}` : ""),
+    );
+  }
 }
 
 if (process.argv[1]?.endsWith("build_demo_report.ts")) {

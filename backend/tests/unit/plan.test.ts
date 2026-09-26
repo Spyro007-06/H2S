@@ -52,7 +52,7 @@ describe("7-day plan", () => {
   it("uses the cached LLM fix-task exercise when present, template otherwise", () => {
     const withTask = claim("CL-001", "git", "bluff", 0, {
       missing_concepts: ["merge vs rebase"],
-      fix_task: { claim_id: "CL-001", skill_id: "git", missing_concepts: ["merge vs rebase"], explanation: "e", exercise: "Rebase a branch" },
+      fix_task: { claim_id: "CL-001", skill_id: "git", root_cause: null, missing_concepts: ["merge vs rebase"], explanation: "e", exercise: "Rebase a branch" },
     });
     const noTask = claim("CL-002", "testing", "shaky", 0.25, { missing_concepts: ["mocking fetch"] });
     const plan = buildPlan(role, [withTask, noTask], []);

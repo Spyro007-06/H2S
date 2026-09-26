@@ -1,5 +1,6 @@
 {
   "session_id": "s_demo",
+  "mode": "prepare",
   "role": {
     "id": "frontend_developer",
     "name": "Frontend Developer"
@@ -109,7 +110,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:00:46.000Z"
         },
@@ -150,7 +152,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "Reconciliation"
           },
           "asked_at": "2026-09-26T09:01:09.000Z"
         }
@@ -159,6 +162,7 @@
       "fix_task": {
         "claim_id": "CL-001",
         "skill_id": "react_state",
+        "root_cause": "Reconciliation",
         "missing_concepts": [
           "Reconciliation: the new element tree is diffed against the previous one; the virtual DOM is not a cache",
           "How useSelector subscribes to the store and triggers a re-render when the selected value changes"
@@ -166,7 +170,10 @@
         "explanation": "The virtual DOM is **not a cache**. On `dispatch`, Redux runs the reducer and notifies subscribers; each `useSelector` re-runs its selector and compares the result with `===`. If it changed, that component **re-renders**: React calls it again, builds a new element tree, **diffs** it against the previous one (reconciliation, matching list rows by `key`) and **commits** only the changed DOM nodes. Hooks don't make anything faster; they're how components subscribe.",
         "exercise": "Build a 50-row product table with a Redux filter. Add `console.count` in each row and use React DevTools \"Highlight updates\". Change the filter and explain which components re-rendered and why. Then memoize the row and select only what it needs.\n\n**Done when** changing the filter re-renders only the table and the rows whose data changed."
       },
-      "rewrite": "Built React + Redux Toolkit product and cart slices for a 10k-item dashboard (learning render/reconciliation internals)"
+      "rewrite": "Built React + Redux Toolkit product and cart slices for a 10k-item dashboard (learning render/reconciliation internals)",
+      "root_cause": "Reconciliation",
+      "retest_status": "scheduled",
+      "retest_unlocks_after": 2
     },
     {
       "id": "CL-002",
@@ -308,7 +315,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:01:55.000Z"
         },
@@ -349,7 +357,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:02:18.000Z"
         },
@@ -390,14 +399,18 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:02:41.000Z"
         }
       ],
       "retest": null,
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-003",
@@ -551,7 +564,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:03:27.000Z"
         },
@@ -592,7 +606,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:03:50.000Z"
         },
@@ -633,7 +648,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "CSS Grid tracks & fr"
           },
           "asked_at": "2026-09-26T09:04:13.000Z"
         },
@@ -674,19 +690,24 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:08:49.000Z"
+          "asked_at": "2026-09-26T09:06:54.000Z"
         }
       ],
       "retest": {
         "attempted": true,
         "passed": true,
         "before": 0.6,
-        "after": 1
+        "after": 1,
+        "interleaved_claims": 2
       },
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "done",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-004",
@@ -753,7 +774,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "What coverage measures"
           },
           "asked_at": "2026-09-26T09:04:59.000Z"
         }
@@ -762,6 +784,7 @@
       "fix_task": {
         "claim_id": "CL-004",
         "skill_id": "testing",
+        "root_cause": "What coverage measures",
         "missing_concepts": [
           "What line/branch coverage measures and what it doesn't",
           "Tests you personally wrote and what they asserted"
@@ -769,7 +792,10 @@
         "explanation": "Coverage counts which **lines and branches ran** during tests, not whether behaviour is correct. A test isolates a unit by **rendering** it (e.g. Testing Library), **mocking** its dependencies such as `fetch`, and **asserting** on what the user sees. Owning a test means you can say what it asserts and which bug it would catch.",
         "exercise": "Write 3 Vitest + Testing Library tests for a `<CartSummary>` component: empty cart, one item, and a failed price fetch (mock `fetch` to reject). Run coverage and find one covered line whose bug your tests would *not* catch.\n\n**Done when** all 3 pass and you can name that uncaught bug."
       },
-      "rewrite": "Ran and maintained an existing Jest test suite (80% template coverage); writing my own component tests"
+      "rewrite": "Ran and maintained an existing Jest test suite (80% template coverage); writing my own component tests",
+      "root_cause": "What coverage measures",
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-005",
@@ -854,7 +880,8 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:05:45.000Z"
         },
@@ -895,7 +922,8 @@
             "admits_gap": true,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
           "asked_at": "2026-09-26T09:06:08.000Z"
         }
@@ -904,6 +932,7 @@
       "fix_task": {
         "claim_id": "CL-005",
         "skill_id": "git",
+        "root_cause": null,
         "missing_concepts": [
           "Explains what a commit is (snapshot + parent pointer) and how a merge or rebase combines histories",
           "Explains how a merge conflict arises and the steps to resolve it"
@@ -911,7 +940,10 @@
         "explanation": "A commit is a **snapshot plus a pointer to its parent(s)**. To merge, Git finds the **merge base** (common ancestor) and does a 3-way comparison: base vs yours vs theirs. If both sides changed the **same lines** differently, Git can't choose and writes conflict markers `<<<<<<<`, `=======`, `>>>>>>>`.",
         "exercise": "In a scratch repo, create `main` and `feature`, edit the same line of `package.json` differently on each, then merge. Run `git merge-base main feature` and `git show :1:package.json` / `:2:` / `:3:` to see base, ours and theirs.\n\n**Done when** you can explain the conflict using those three versions."
       },
-      "rewrite": "Used feature branches and pull requests in a 4-person team; reviewed PRs and resolved merge conflicts"
+      "rewrite": "Used feature branches and pull requests in a 4-person team; reviewed PRs and resolved merge conflicts",
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-006",
@@ -1038,9 +1070,10 @@
             "admits_gap": false,
             "needs_clarification": true,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:06:54.000Z"
+          "asked_at": "2026-09-26T09:07:40.000Z"
         },
         {
           "level": 1,
@@ -1079,9 +1112,10 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:07:17.000Z"
+          "asked_at": "2026-09-26T09:08:03.000Z"
         },
         {
           "level": 2,
@@ -1120,9 +1154,10 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": true,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": null
           },
-          "asked_at": "2026-09-26T09:07:40.000Z"
+          "asked_at": "2026-09-26T09:08:26.000Z"
         },
         {
           "level": 3,
@@ -1161,15 +1196,17 @@
             "admits_gap": false,
             "needs_clarification": false,
             "level_passed": false,
-            "guard_flips": []
+            "guard_flips": [],
+            "root_cause": "ES modules & dynamic import"
           },
-          "asked_at": "2026-09-26T09:08:03.000Z"
+          "asked_at": "2026-09-26T09:08:49.000Z"
         }
       ],
       "retest": null,
       "fix_task": {
         "claim_id": "CL-006",
         "skill_id": "js_fundamentals",
+        "root_cause": "ES modules & dynamic import",
         "missing_concepts": [
           "Route vs component splitting: chunk count, waterfalls and cache reuse",
           "A real cost of code splitting, such as loading waterfalls or a spinner flash on navigation"
@@ -1177,7 +1214,10 @@
         "explanation": "**Route-level** splitting gives few, large chunks that cache well and load once per page. **Component-level** splitting gives many small chunks but can create **waterfalls** (a chunk that imports another chunk) and spinner flashes during navigation. Mitigations are **prefetching** on hover or idle and grouping libraries shared by several routes.",
         "exercise": "In a Vite app, lazy-load two routes that share a chart library. Build with `vite build` and inspect the chunk list. Then add `import()` prefetch on link hover and compare the Network waterfall.\n\n**Done when** you can show the chunk graph and explain one waterfall you removed."
       },
-      "rewrite": "Cut main bundle from 1.1 MB to 640 kB with route-level React.lazy code splitting (LCP 4.2s → 2.5s)"
+      "rewrite": "Cut main bundle from 1.1 MB to 640 kB with route-level React.lazy code splitting (LCP 4.2s → 2.5s)",
+      "root_cause": "ES modules & dynamic import",
+      "retest_status": "none",
+      "retest_unlocks_after": null
     },
     {
       "id": "CL-007",
@@ -1193,7 +1233,10 @@
       "qa": [],
       "retest": null,
       "fix_task": null,
-      "rewrite": null
+      "rewrite": null,
+      "root_cause": null,
+      "retest_status": "none",
+      "retest_unlocks_after": null
     }
   ],
   "skills": [
@@ -1208,7 +1251,7 @@
       ],
       "history": [
         {
-          "at": "2026-09-26T09:08:26.000Z",
+          "at": "2026-09-26T09:09:12.000Z",
           "mode": "assess",
           "claim_id": "CL-006",
           "proficiency": 0.6
@@ -1268,7 +1311,7 @@
           "proficiency": 0.6
         },
         {
-          "at": "2026-09-26T09:09:12.000Z",
+          "at": "2026-09-26T09:07:17.000Z",
           "mode": "retest",
           "claim_id": "CL-003",
           "proficiency": 1
@@ -1401,7 +1444,7 @@
       "skill_id": "react_state",
       "claim_id": "CL-001",
       "score": 0.15,
-      "reason": "20% role weight, failed at L2"
+      "reason": "20% role weight, failed at L2 (root cause: Reconciliation)"
     },
     {
       "rank": 2,
@@ -1415,7 +1458,7 @@
       "skill_id": "testing",
       "claim_id": "CL-004",
       "score": 0.1,
-      "reason": "10% role weight, failed at L1"
+      "reason": "10% role weight, failed at L1 (root cause: What coverage measures)"
     }
   ],
   "plan": [
@@ -1458,6 +1501,7 @@
   "progress": {
     "claims_total": 7,
     "claims_done": 6,
-    "next_claim_id": "CL-007"
+    "next_claim_id": "CL-007",
+    "next_mode": "assess"
   }
 }

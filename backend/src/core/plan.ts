@@ -17,8 +17,13 @@ function weakestClaim(skillClaims: readonly Claim[]): Claim | null {
 }
 
 function priorityReason(skill: RoleSkill, claim: Claim | null): string {
-  const w = `${pct(skill.weight)} role weight`;
   if (claim === null) return "Required by role, never claimed";
+  const base = baseReason(skill, claim);
+  return claim.root_cause ? `${base} (root cause: ${claim.root_cause})` : base;
+}
+
+function baseReason(skill: RoleSkill, claim: Claim): string {
+  const w = `${pct(skill.weight)} role weight`;
   const failedAt = `L${claim.levels_passed + 1}`;
   switch (claim.verdict) {
     case "pending":

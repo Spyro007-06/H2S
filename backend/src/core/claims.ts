@@ -22,6 +22,9 @@ export function newClaim(
     retest: null,
     fix_task: null,
     rewrite: null,
+    root_cause: null,
+    retest_status: "none",
+    retest_unlocks_after: null,
   };
 }
 

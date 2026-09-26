@@ -31,6 +31,18 @@ with `SETUP=1 bash backend/scripts/deploy.sh`; it prints the `https://unbluff-ap
 | **Cloud Logging** | Structured pino logs with Cloud Logging `severity`; every LLM call logs prompt, model, latency, validity |
 | **Firebase Hosting** | Serves the React frontend (`frontend/dist`, SPA rewrites) |
 
+## Learning loop: prepare mode, root causes, delayed retests
+
+- **Two modes.** `defense` simulates the interview. `prepare` returns `teach_now: true` the moment a claim
+  ends shaky/bluff/gap, so the UI teaches immediately.
+- **Root cause, zero extra calls.** Each skill lists 3–5 prerequisites (most fundamental first). The
+  GRADE call also names the most fundamental missing one; code keeps it only if it's exactly on the
+  list. Fix tasks and retests target the root cause, not just the symptom.
+- **Delayed, interleaved retest.** Opening a fix task schedules the retest, which unlocks only after
+  **2 other concepts** are completed (spacing + interleaving). A due retest jumps the queue
+  (`next_mode: "retest"`), and its question is a fresh scenario. `interleaved_claims` records the real
+  gap and is never inflated.
+
 ## Architecture: the LLM writes language, code decides the score
 
 ```mermaid
@@ -55,6 +67,7 @@ flowchart LR
       SM[Turn state machine<br/>question / clarify / done]
       SC[Readiness · coverage<br/>skill states]
       PL[Priorities · 7-day plan<br/>resume heatmap]
+      SCH[Retest scheduler<br/>scheduled → due → done]
     end
     ST[(Session store<br/>memory · Firestore)]
   end
@@ -65,6 +78,7 @@ flowchart LR
   G -->|criteria booleans + quotes<br/>NEVER a score| SVC
   SVC --> EV --> RU --> SM
   SVC --> SC --> PL
+  SVC --> SCH
   SVC <--> ST
 ```
 
@@ -173,7 +187,7 @@ sessions (`STORE=firestore`) and never bakes secrets into the image.
 
 ## Tests and quality
 
-Latest run: **111 tests passing** (16 files). Coverage: **93.2% lines / 83.8% branches overall**,
+Latest run: **123 tests passing** (18 files). Coverage: **93.7% lines / 84.8% branches overall**,
 **100% lines on `src/core`** (the deterministic scoring core; CI enforces ≥ 95%).
 
 ```bash

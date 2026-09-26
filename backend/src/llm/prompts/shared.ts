@@ -22,7 +22,7 @@ export function studentBlock(tag: string, text: string): string {
 export const LEVEL_FOCUS: Record<Level, string> = {
   1: "L1 (What/ownership): what exactly they built or know, and THEIR personal part",
   2: "L2 (How/mechanism): how it works internally, step by step",
-  3: "L3 (Why/trade-offs): why this design, the alternatives, and what broke",
+  3: "L3 (Why/trade-offs): why this approach, WHEN they would NOT use it, and defending the decision against a concrete alternative",
 };
 
 export function criteriaList(skill: RoleSkill | null, level: Level): string {

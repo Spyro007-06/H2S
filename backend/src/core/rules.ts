@@ -9,6 +9,7 @@ import type {
   Verdict,
 } from "../types.js";
 import { applyEvidenceGuard, CRITERIA } from "./evidence.js";
+import { validateRootCause } from "./schedule.js";
 
 /** Criteria that must ALL pass for a level to pass. */
 export const LEVEL_RULES: Record<Level, readonly Criterion[]> = {
@@ -39,21 +40,24 @@ export interface RawGrade {
   criteria: Record<Criterion, CriterionResult>;
   admits_gap: boolean;
   needs_clarification: boolean;
+  root_cause?: string | null;
 }
 
 export function levelPassed(level: Level, criteria: Record<Criterion, CriterionResult>): boolean {
   return LEVEL_RULES[level].every((name) => criteria[name].passed);
 }
 
-/** Evidence guard first, then the deterministic level rule. */
-export function finalizeGrade(raw: RawGrade, answer: string, level: Level): Grade {
+/** Evidence guard first, then the deterministic level rule; root_cause must be a listed prerequisite. */
+export function finalizeGrade(raw: RawGrade, answer: string, level: Level, prerequisites: readonly string[] = []): Grade {
   const { criteria, flips } = applyEvidenceGuard(raw.criteria, answer);
+  const passed = !raw.admits_gap && levelPassed(level, criteria);
   return {
     criteria,
     admits_gap: raw.admits_gap,
     needs_clarification: raw.needs_clarification,
-    level_passed: !raw.admits_gap && levelPassed(level, criteria),
+    level_passed: passed,
     guard_flips: flips,
+    root_cause: passed ? null : validateRootCause(raw.root_cause, prerequisites),
   };
 }
 

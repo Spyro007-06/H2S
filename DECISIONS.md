@@ -112,3 +112,45 @@ Running log of judgement calls, contract notes, stubs and audit results.
 - Frontend timeout note: interrogate can make 2 LLM calls (grade + next question), and each call may
   retry once. Typical latency is 3–8 s, but a slow worst case can pass 30 s. Consider 45–60 s for
   `/interrogate` and `/report`.
+
+## Addendum 2: learning loop (contract change, additive only)
+
+**Ordering note:** the brief says to do this after the Cloud Run deploy + verification. The deploy is
+blocked (no `gcloud` on the dev machine), so the addendum was built first. The deploy script ships
+everything once gcloud is available.
+
+**Contract additions (§3/§4/§5), nothing renamed or removed:**
+- Enums `SessionMode` (`prepare` | `defense`), `RetestStatus` (`none` | `scheduled` | `due` | `done`).
+- `ExtractRequest.mode?`; `ClaimsResponse.mode`; `Report.mode`.
+- `RoleSkill.prerequisites`; `Grade.root_cause`; `FixTask.root_cause`.
+- `Claim.root_cause`, `Claim.retest_status`, `Claim.retest_unlocks_after` (the brief's "ClaimResult"
+  is our `Claim`); `RetestResult.interleaved_claims`.
+- `Progress.next_mode`; `TurnResponse.next_mode`, `TurnResponse.teach_now` (the brief's
+  "InterrogateResponse" is our `TurnResponse`).
+- **Semantics change on an existing field:** `Progress.next_claim_id` now prefers a due retest over the
+  next pending claim (it used to be "first pending"). Requested explicitly; the frontend should route
+  on `next_mode`.
+- **Behaviour change:** `mode: "retest"` now also requires `retest_status: "due"`, which means opening the
+  fix task first. Older clients that retest immediately get 400, except when nothing else is pending
+  (rule 3 forces the retest due).
+
+**Decisions:**
+- Internal `teach_completed_at_claims_done` is the session's completion counter (every assess or
+  retest `done`, including `error` endings) at fix-task time. `interleaved_claims` = counter at retest
+  start minus that. It is the real number: a forced-due retest right after the fix task records 0.
+- A claim's own completion never counts down its own retest; `error` endings of other claims do count
+  (they are `turn: "done"`).
+- Report-time fix-task generation does not schedule retests; only `POST /api/fix-task` does
+  (the student must actually open the task).
+- Re-opening the fix task while scheduled/due doesn't reset the countdown. After a retest (`done`), a
+  still-weak claim can be scheduled again by opening its new fix task.
+- `root_cause` is always `null` on a passed level, and validation is exact string match.
+- Higher levels inside a retest target that level's role criteria (`rootCause: null`); the first retest
+  question targets `root_cause` (else `missing_concepts`).
+- Mock provider: `root_cause` = the skill's first (most fundamental) prerequisite on any failure;
+  `null` on a pass. Deterministic.
+- The new key (supplied mid-session) replaced the old one in `backend/.env` only. It is also free tier,
+  so `gemini-3.1-flash-lite` stays primary.
+- Live check after the GRADE change: 6/6 still, and root causes come back as valid prerequisites
+  (e.g. "Component render cycle" for the virtual-DOM-cache answer, "Immutability" for a
+  mutate-then-setState bug).

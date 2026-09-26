@@ -24,13 +24,14 @@ export interface LLMProvider {
   question(input: QuestionContext): Promise<string>;
   clarify(input: QuestionContext & { vaguePoints: string[] }): Promise<string>;
   retestQuestion(
-    input: QuestionContext & { missingConcepts: string[]; previousQuestions: string[] },
+    input: QuestionContext & { missingConcepts: string[]; rootCause: string | null; previousQuestions: string[] },
   ): Promise<string>;
   grade(input: QuestionContext & { question: string; answer: string }): Promise<RawGrade>;
   fixTask(input: {
     role: Role;
     claim: Claim;
     missingConcepts: string[];
+    rootCause: string | null;
   }): Promise<{ explanation: string; exercise: string }>;
   rewrite(input: { claim: Claim; evidenceSummary: string }): Promise<string>;
 }

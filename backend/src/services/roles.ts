@@ -18,6 +18,7 @@ const RoleSchema = z.object({
         description: z.string().min(1),
         keywords: z.array(z.string().min(1)).min(1),
         levels: z.object({ L1: criteriaList, L2: criteriaList, L3: criteriaList }),
+        prerequisites: z.array(z.string().min(1)).min(3).max(5),
       }),
     )
     .min(1),

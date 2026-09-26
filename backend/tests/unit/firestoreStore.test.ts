@@ -49,11 +49,14 @@ function session(): Session {
           needs_clarification: false,
           level_passed: true,
           guard_flips: [],
+          root_cause: null,
         },
         asked_at: "2026-09-26T10:00:00.000Z",
       },
     ],
-    retest: { attempted: true, passed: false, before: 0.25, after: 0.25 },
+    retest: { attempted: true, passed: false, before: 0.25, after: 0.25, interleaved_claims: 2 },
+    root_cause: "Reconciliation",
+    retest_status: "done",
   });
   return {
     id: "s_fs",
@@ -63,9 +66,12 @@ function session(): Session {
     declared_skills: ["React"],
     claims: [c],
     next_seq: 2,
-    cursors: { "CL-001": { mode: "retest", level: 2, start_level: 2, clarify_used: true } },
+    mode: "prepare",
+    cursors: { "CL-001": { mode: "retest", level: 2, start_level: 2, clarify_used: true, interleaved_claims: 2 } },
     history: [{ at: "2026-09-26T10:01:00.000Z", mode: "assess", claim_id: "CL-001", skill_id: "react_state", proficiency: 0.25 }],
     guard_flips: 3,
+    completions: 5,
+    schedule: { "CL-001": { teach_completed_at_claims_done: 3, order: 1 } },
   };
 }
 
@@ -99,7 +105,8 @@ describe("FirestoreStore (mocked client)", () => {
     expect(write.data.updated_at).toBeInstanceOf(Date);
     const parsed = JSON.parse(write.data.json as string) as Session;
     expect(parsed.claims[0]?.qa[0]?.grade?.criteria.mechanism.missing_concept).toBe("how it re-renders");
-    expect(parsed.cursors["CL-001"]).toEqual({ mode: "retest", level: 2, start_level: 2, clarify_used: true });
+    expect(parsed.cursors["CL-001"]).toEqual({ mode: "retest", level: 2, start_level: 2, clarify_used: true, interleaved_claims: 2 });
+    expect(parsed.schedule["CL-001"]).toEqual({ teach_completed_at_claims_done: 3, order: 1 });
     expect(parsed.history[0]?.skill_id).toBe("react_state");
   });
 

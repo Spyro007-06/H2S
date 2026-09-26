@@ -10,6 +10,8 @@ const Verdict = z.enum(["pending", "defended", "shaky", "bluff", "honest_gap", "
 const SkillState = z.enum(["ready", "needs_work", "unverified", "blind_spot", "deprioritized"]);
 const Criterion = z.enum(["accuracy", "specificity", "mechanism", "ownership", "tradeoff"]);
 const Mode = z.enum(["assess", "retest"]);
+const SessionMode = z.enum(["prepare", "defense"]);
+const RetestStatus = z.enum(["none", "scheduled", "due", "done"]);
 const unit = z.number().min(0).max(1);
 const pct = z.number().int().min(0).max(100);
 
@@ -31,6 +33,7 @@ export const GradeSchema = z.strictObject({
   needs_clarification: z.boolean(),
   level_passed: z.boolean(),
   guard_flips: z.array(Criterion),
+  root_cause: z.string().nullable(),
 });
 
 const QA = z.strictObject({
@@ -46,6 +49,7 @@ const QA = z.strictObject({
 const FixTask = z.strictObject({
   claim_id: z.string(),
   skill_id: z.string().nullable(),
+  root_cause: z.string().nullable(),
   missing_concepts: z.array(z.string()),
   explanation: z.string(),
   exercise: z.string(),
@@ -63,9 +67,14 @@ export const ClaimSchema = z.strictObject({
   missing_concepts: z.array(z.string()),
   evidence: z.array(z.strictObject({ level: Level, criterion: Criterion, passed: z.boolean(), quote: z.string() })),
   qa: z.array(QA),
-  retest: z.strictObject({ attempted: z.boolean(), passed: z.boolean(), before: unit, after: unit }).nullable(),
+  retest: z
+    .strictObject({ attempted: z.boolean(), passed: z.boolean(), before: unit, after: unit, interleaved_claims: z.number().int().min(0) })
+    .nullable(),
   fix_task: FixTask.nullable(),
   rewrite: z.string().nullable(),
+  root_cause: z.string().nullable(),
+  retest_status: RetestStatus,
+  retest_unlocks_after: z.number().int().min(0).nullable(),
 });
 
 const BlindSpot = z.strictObject({ skill_id: z.string(), name: z.string(), weight: unit });
@@ -73,10 +82,12 @@ export const ProgressSchema = z.strictObject({
   claims_total: z.number().int(),
   claims_done: z.number().int(),
   next_claim_id: z.string().nullable(),
+  next_mode: Mode.nullable(),
 });
 
 export const ReportSchema = z.strictObject({
   session_id: z.string(),
+  mode: SessionMode,
   role: z.strictObject({ id: z.string(), name: z.string() }),
   generated_at: z.iso.datetime(),
   readiness: pct,
@@ -110,6 +121,7 @@ export const ReportSchema = z.strictObject({
 export const ClaimsResponseSchema = z.strictObject({
   session_id: z.string(),
   role_id: z.string(),
+  mode: SessionMode,
   claims: z.array(ClaimSchema),
   blind_spots: z.array(BlindSpot),
   progress: ProgressSchema,
@@ -125,6 +137,8 @@ export const TurnResponseSchema = z.strictObject({
   grade: GradeSchema.nullable(),
   claim: ClaimSchema,
   progress: ProgressSchema,
+  next_mode: Mode.nullable(),
+  teach_now: z.boolean(),
 });
 
 export const ErrorSchema = z.strictObject({

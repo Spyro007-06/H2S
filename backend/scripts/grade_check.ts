@@ -93,7 +93,7 @@ async function main() {
   for (const c of CASES) {
     const t = performance.now();
     const raw = await llm.grade({ role, skill, claim, level: 2, history: [], question: QUESTION, answer: c.answer });
-    const grade = finalizeGrade(raw, c.answer, 2); // code decides, after the evidence guard
+    const grade = finalizeGrade(raw, c.answer, 2, skill.prerequisites); // code decides, after the evidence guard
     const turn = decideTurn(startCursor("assess", 2), grade).turn;
     const pass = c.ok(grade);
     if (!pass) failures++;
@@ -101,7 +101,7 @@ async function main() {
     rows.push([
       `(${c.id}) ${c.label}`,
       c.expected,
-      `${crit} gap=${grade.admits_gap ? "T" : "F"} vague=${grade.needs_clarification ? "T" : "F"} L2=${grade.level_passed ? "PASS" : "FAIL"} turn=${turn} flips=${grade.guard_flips.length}`,
+      `${crit} gap=${grade.admits_gap ? "T" : "F"} vague=${grade.needs_clarification ? "T" : "F"} L2=${grade.level_passed ? "PASS" : "FAIL"} turn=${turn} root=${grade.root_cause ?? "-"}`,
       pass ? "OK" : "WRONG",
       `${Math.round(performance.now() - t)}ms`,
     ]);
@@ -109,7 +109,7 @@ async function main() {
     if (missing.length) console.log(`(${c.id}) missing → ${missing.slice(0, 2).join(" | ")}`);
   }
 
-  const widths = [22, 38, 72, 5, 7];
+  const widths = [22, 38, 90, 5, 7];
   const line = (cols: string[]) => cols.map((col, i) => col.padEnd(widths[i]!)).join(" | ");
   console.log(`\n${line(["case", "expected", "actual (code-computed)", "ok", "latency"])}`);
   console.log(widths.map((w) => "-".repeat(w)).join("-|-"));

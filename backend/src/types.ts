@@ -11,6 +11,8 @@ export type Mode = "assess" | "retest";
 export type TurnType = "question" | "clarify" | "done";
 export type QuestionKind = "question" | "clarify" | "retest";
 export type LlmMode = "live" | "mock";
+export type SessionMode = "prepare" | "defense"; // added (learning loop)
+export type RetestStatus = "none" | "scheduled" | "due" | "done"; // added (learning loop)
 export type ErrorCode =
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -36,6 +38,7 @@ export interface RoleSkill {
   description: string;
   keywords: string[];
   levels: LevelCriteria;
+  prerequisites: string[]; // added: 3–5 concepts, most fundamental first
 }
 
 export interface Role {
@@ -65,6 +68,7 @@ export interface Grade {
   needs_clarification: boolean;
   level_passed: boolean; // computed by backend code, never by the LLM
   guard_flips: Criterion[]; // criteria forced to false because the quote was not in the answer
+  root_cause: string | null; // added: one of the skill's prerequisites (validated in code) or null
 }
 
 // ---------- Claims ----------
@@ -90,11 +94,13 @@ export interface RetestResult {
   passed: boolean; // after > before
   before: number;
   after: number;
+  interleaved_claims: number; // added: other claims completed between the fix task and the retest start
 }
 
 export interface FixTask {
   claim_id: string;
   skill_id: string | null;
+  root_cause: string | null; // added: the prerequisite the task targets first, if diagnosed
   missing_concepts: string[];
   explanation: string; // markdown, <= 120 words
   exercise: string; // markdown
@@ -115,6 +121,9 @@ export interface Claim {
   retest: RetestResult | null;
   fix_task: FixTask | null;
   rewrite: string | null; // honest resume rewrite, only for shaky/bluff/honest_gap
+  root_cause: string | null; // added: root cause from the failing level (null if none / passed)
+  retest_status: RetestStatus; // added
+  retest_unlocks_after: number | null; // added: other claims still to finish before the retest is due
 }
 
 export interface ClaimInput {
@@ -133,7 +142,8 @@ export interface BlindSpot {
 export interface Progress {
   claims_total: number;
   claims_done: number; // claims whose verdict is not "pending"
-  next_claim_id: string | null; // first "pending" claim in list order
+  next_claim_id: string | null; // first due retest, else first "pending" claim, else null (see §5)
+  next_mode: Mode | null; // added: what to do with next_claim_id
 }
 
 // ---------- Report ----------
@@ -179,6 +189,7 @@ export interface PlanItem {
 
 export interface Report {
   session_id: string;
+  mode: SessionMode; // added
   role: { id: string; name: string };
   generated_at: string;
   readiness: number; // 0..100
@@ -206,6 +217,7 @@ export interface RolesResponse {
 
 export interface ExtractRequest {
   role_id: string;
+  mode?: SessionMode; // added, default "defense"
   resume_text?: string | null; // <= 20000 chars
   declared_skills?: string[]; // <= 20 chips, each <= 60 chars
 }
@@ -213,6 +225,7 @@ export interface ExtractRequest {
 export interface ClaimsResponse {
   session_id: string;
   role_id: string;
+  mode: SessionMode; // added
   claims: Claim[];
   blind_spots: BlindSpot[];
   progress: Progress;
@@ -240,6 +253,8 @@ export interface TurnResponse {
   grade: Grade | null; // grade of the answer just submitted; null on start
   claim: Claim;
   progress: Progress;
+  next_mode: Mode | null; // added: same as progress.next_mode
+  teach_now: boolean; // added: prepare mode and this turn finished the claim as shaky/bluff/honest_gap
 }
 
 export interface FixTaskRequest {

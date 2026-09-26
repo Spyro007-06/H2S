@@ -34,6 +34,7 @@ export const GradeOutput = z.object({
   }),
   admits_gap: z.boolean(),
   needs_clarification: z.boolean(),
+  root_cause: z.string().nullable().optional(), // validated against the skill's prerequisites in code
 });
 export type GradeOutput = z.infer<typeof GradeOutput>;
 

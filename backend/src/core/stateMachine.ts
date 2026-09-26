@@ -11,6 +11,7 @@ export interface Cursor {
   level: Level;
   start_level: Level;
   clarify_used: boolean; // for the current level
+  interleaved_claims: number; // retest only: other claims completed between fix task and retest start
 }
 
 /** How a ladder run ended. */
@@ -24,8 +25,8 @@ export type TurnDecision =
   | { turn: "question"; cursor: Cursor }
   | { turn: "done"; outcome: Outcome };
 
-export function startCursor(mode: Mode, level: Level): Cursor {
-  return { mode, level, start_level: level, clarify_used: false };
+export function startCursor(mode: Mode, level: Level, interleavedClaims = 0): Cursor {
+  return { mode, level, start_level: level, clarify_used: false, interleaved_claims: interleavedClaims };
 }
 
 /** Deterministic turn transition from a finalized (guarded) grade. */
@@ -75,7 +76,7 @@ export interface RetestScore extends ClaimScore {
  * Retest result: 1.0 if it passes through L3, otherwise the proficiency implied by levels
  * passed, never lower than before. Verdict becomes `defended` only on a full pass.
  */
-export function resolveRetest(previous: ClaimScore, outcome: Outcome): RetestScore {
+export function resolveRetest(previous: ClaimScore, outcome: Outcome, interleavedClaims = 0): RetestScore {
   const before = previous.proficiency;
   const implied = levelsImplied(outcome);
   const full = outcome.kind === "passed_all";
@@ -86,6 +87,6 @@ export function resolveRetest(previous: ClaimScore, outcome: Outcome): RetestSco
     verdict: full ? "defended" : previous.verdict,
     levels_passed: Math.max(previous.levels_passed, implied) as LevelsPassed,
     proficiency: after,
-    retest: { attempted: true, passed: after > before, before, after },
+    retest: { attempted: true, passed: after > before, before, after, interleaved_claims: interleavedClaims },
   };
 }

@@ -1,4 +1,4 @@
-import type { Claim, Report, Role, SkillHistoryEntry, SkillReport } from "../types.js";
+import type { Claim, Report, Role, SessionMode, SkillHistoryEntry, SkillReport } from "../types.js";
 import { buildPlan, buildPriorities } from "./plan.js";
 import { buildResumeLines } from "./resumeLines.js";
 import { isWeakVerdict } from "./rules.js";
@@ -15,6 +15,7 @@ import {
 /** The subset of a session the report needs. */
 export interface ReportInput {
   session_id: string;
+  mode: SessionMode;
   resume_text: string | null;
   claims: readonly Claim[];
   history: readonly (SkillHistoryEntry & { skill_id: string })[];
@@ -47,6 +48,7 @@ export function buildReport(input: ReportInput, role: Role, generatedAt: string)
   const priorities = buildPriorities(role, claims);
   return {
     session_id: input.session_id,
+    mode: input.mode,
     role: { id: role.id, name: role.name },
     generated_at: generatedAt,
     readiness: readiness(role, claims),

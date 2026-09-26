@@ -1,4 +1,5 @@
 import type { BlindSpot, Claim, Progress, Role, RoleSkill, SkillState, Verdict } from "../types.js";
+import { nextStep } from "./schedule.js";
 
 /** Pending and error claims are "not assessed". */
 export function isAssessed(verdict: Verdict): boolean {
@@ -46,6 +47,6 @@ export function progress(claims: readonly Claim[]): Progress {
   return {
     claims_total: claims.length,
     claims_done: claims.filter((c) => c.verdict !== "pending").length,
-    next_claim_id: claims.find((c) => c.verdict === "pending")?.id ?? null,
+    ...nextStep(claims),
   };
 }
