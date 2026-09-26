@@ -11,25 +11,27 @@ heatmap, role coverage, blind spots (required skills never claimed), a readiness
 plan and honest resume rewrites. A retest with a **fresh scenario question** proves the improvement.
 
 Built for **Prompt Wars (Hack2Skill × Google Developer Groups)** on **Gemini** via the official
-`@google/genai` SDK, deployable to **Cloud Run** (+ Firestore, Secret Manager) with the frontend on
-**Firebase Hosting**.
+`@google/genai` SDK. The backend runs on **Render's free Docker tier** (no billing account needed);
+the frontend is served from **Firebase Hosting** (free Spark plan). A Cloud Run + Firestore path is
+included for teams with billing enabled.
 
-**Backend URL:** _not deployed yet_ (the Cloud SDK isn't installed on the build machine). Deploy
-with `SETUP=1 bash backend/scripts/deploy.sh`; it prints the `https://unbluff-api-….run.app` URL.
+**Backend URL:** _pending first Render deploy_ (`https://unbluff-api.onrender.com` or similar).
 
 ## Google services
 
-| Service | Used for |
-|---|---|
-| **Gemini API** `gemini-3.1-flash-lite` (primary) | Claim extraction, questions, clarify/retest scenarios, per-criterion grading, fix tasks, rewrites (structured JSON output) |
-| **Gemini API** `gemini-3.6-flash` (fallback; swap to primary once billing is on) | Single retry after a 429/5xx; primary is skipped during the quota "retry in Ns" window |
-| **Cloud Run** | Hosts the Express API (`unbluff-api`, asia-south1, 0–3 instances) |
-| **Cloud Build** | Builds the `backend/Dockerfile` image remotely (`gcloud run deploy --source backend`) |
-| **Artifact Registry** | Stores the built image |
-| **Firestore** (Native) | Session store on Cloud Run (`STORE=firestore`) |
-| **Secret Manager** | `gemini-api-key`, injected with `--set-secrets`, never in the image or repo |
-| **Cloud Logging** | Structured pino logs with Cloud Logging `severity`; every LLM call logs prompt, model, latency, validity |
-| **Firebase Hosting** | Serves the React frontend (`frontend/dist`, SPA rewrites) |
+| Service | Status | Used for |
+|---|---|---|
+| **Gemini API** `gemini-3.1-flash-lite` (primary) | ✅ live | Claim extraction, questions, clarify/retest scenarios, per-criterion grading + root cause, fix tasks, rewrites (structured JSON output) |
+| **Gemini API** `gemini-3.6-flash` (fallback) | ✅ live | Single retry after a 429/5xx; primary skipped during the quota "retry in Ns" window. Swap to primary once billing is on (free tier: 20 req/day) |
+| **Google Gen AI SDK** (`@google/genai`) | ✅ live | Official client: structured output (`responseJsonSchema`), thinking level, abort/timeout |
+| **Firebase Hosting** | ✅ free Spark plan | Serves the React frontend (`frontend/dist`, SPA rewrites) |
+| **Cloud Run · Cloud Build · Artifact Registry** | ⚙️ ready, needs billing | `backend/scripts/deploy.sh` (`gcloud run deploy --source backend`, scale to zero) |
+| **Firestore** | ⚙️ ready, needs billing on Cloud Run | `STORE=firestore` session store (unit-tested with a mocked client) |
+| **Secret Manager** | ⚙️ ready, needs billing | Key injected with `--set-secrets` on the Cloud Run path |
+| **Cloud Logging** format | ✅ in code | pino logs carry Cloud Logging `severity`; every LLM call logs prompt, model, latency, validity |
+
+The hosted demo uses the ✅ rows. The ⚙️ rows are implemented and tested but not deployed, because
+the team has no billing account.
 
 ## Learning loop: prepare mode, root causes, delayed retests
 
@@ -137,7 +139,7 @@ Errors are always `{ "error": { "code", "message" } }` with the codes listed in 
 
 ### DEMO_MODE_HINT
 
-If the live model is rate-limited (on the free tier `gemini-3.6-flash` allows only 20 requests/day), interrogation
+If the backend is asleep (Render free tier: ~1 min cold start) or the live model is rate-limited (on the free tier `gemini-3.6-flash` allows only 20 requests/day), interrogation
 still degrades gracefully: fallback model, then a restartable `error` verdict. For a guaranteed
 demo, the UI can load `GET /api/demo/report`, a complete, contract-exact report built by the same
 deterministic core. Signs you are rate-limited: `502 LLM_INVALID_OUTPUT` on retest, or claims
@@ -174,16 +176,34 @@ API=http://localhost:8080 bash scripts/smoke.sh
 SMOKE_DELAY=8 API=http://localhost:8080 bash scripts/smoke.sh   # live, free-tier quota
 ```
 
-Docker / Cloud Run:
+### Deploy (free): Render
+
+The repo ships a Render Blueprint (`render.yaml`): a free Docker web service built from
+`backend/Dockerfile`, health-checked on `/api/health`, auto-deployed on pushes that touch `backend/`.
+
+1. render.com → **New → Blueprint** → connect GitHub → pick this repo → **Apply**.
+2. When prompted, paste your Gemini key into `GEMINI_API_KEY`. It is stored by Render, never in git.
+3. Once the frontend is live, set `CORS_ORIGIN` to its Firebase Hosting URL.
+
+Free-tier caveats: the service **sleeps after ~15 min idle** and the first request after that takes
+about a minute (the UI should call `/api/health` on load). Sessions are **in memory**, so they reset
+when it sleeps or redeploys.
+
+### Deploy (billing enabled): Cloud Run
+
+```bash
+SETUP=1 bash backend/scripts/deploy.sh
+```
+
+This enables the APIs, creates Firestore, pipes the key into **Secret Manager** via stdin, grants
+the runtime service account access, and deploys with Cloud Build (`--source backend`).
+
+Local container:
 
 ```bash
 docker build -t unbluff-api backend
 docker run -p 8080:8080 -e LLM_MODE=mock unbluff-api
-PROJECT=my-project CORS_ORIGIN=https://my-app.web.app bash backend/scripts/deploy.sh
 ```
-
-The deploy script reads the key from **Secret Manager** (`--set-secrets`), uses **Firestore** for
-sessions (`STORE=firestore`) and never bakes secrets into the image.
 
 ## Tests and quality
 

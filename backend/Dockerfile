@@ -1,14 +1,12 @@
 # syntax=docker/dockerfile:1
 
-# ---- build: compile TypeScript ----
+# ---- build: compile TypeScript (src only) ----
 FROM node:20-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-COPY scripts ./scripts
-COPY tests/fixtures ./tests/fixtures
 RUN npm run build
 
 # ---- runtime: production deps + compiled JS + data only ----

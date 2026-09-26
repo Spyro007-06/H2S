@@ -154,3 +154,26 @@ everything once gcloud is available.
 - Live check after the GRADE change: 6/6 still, and root causes come back as valid prerequisites
   (e.g. "Component render cycle" for the virtual-DOM-cache answer, "Immutability" for a
   mutate-then-setState bug).
+
+## Hosting: Render instead of Cloud Run
+
+- The team has no billing account, and Cloud Run / Cloud Build / Artifact Registry / Secret Manager
+  (and Firebase Functions) all require one. The backend therefore deploys to **Render's free Docker
+  web service** via `render.yaml` (Blueprint, region singapore, health check `/api/health`). The
+  frontend stays on **Firebase Hosting** (Spark plan, no billing).
+- The GCP path (`backend/scripts/deploy.sh`, `STORE=firestore`) is kept, tested and documented as
+  "ready, needs billing". The README services table marks what is live vs ready, so we don't claim
+  services the demo doesn't use.
+- **Sessions are in memory on Render** (`STORE=memory`). Firestore without Cloud Run would need a
+  service-account JSON key stored on Render; skipped to avoid handling a long-lived GCP credential.
+  Consequence: sessions reset when the free instance sleeps (~15 min idle) or redeploys.
+- **Cold start ≈ 1 min** after idle. The frontend should call `/api/health` on landing and show a
+  "waking the examiner…" status; `/api/demo/report` is the fallback for the demo.
+- **Dockerfile bug fixed:** `.dockerignore` excludes `tests/`, but the build stage copied
+  `tests/fixtures`, so the image could never have built. `npm run build` now uses
+  `tsconfig.build.json` (src only). Scripts and tests are still typechecked by `npm run typecheck`
+  and CI. Without Docker locally, the build was rehearsed stage by stage (same COPYs, `npm ci`,
+  `npm ci --omit=dev`): the image boots on Render's `PORT=10000`, contains no `.env`, and exits with
+  a clear config error in live mode when `GEMINI_API_KEY` is missing.
+- The Gemini key is declared `sync: false` in `render.yaml`: Render prompts for it once in its
+  dashboard; it never enters the repo.
