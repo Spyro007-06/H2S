@@ -14,6 +14,23 @@ Built for **Prompt Wars (Hack2Skill × Google Developer Groups)** on **Gemini** 
 `@google/genai` SDK, deployable to **Cloud Run** (+ Firestore, Secret Manager) with the frontend on
 **Firebase Hosting**.
 
+**Backend URL:** _not deployed yet_ (the Cloud SDK isn't installed on the build machine). Deploy
+with `SETUP=1 bash backend/scripts/deploy.sh`; it prints the `https://unbluff-api-….run.app` URL.
+
+## Google services
+
+| Service | Used for |
+|---|---|
+| **Gemini API** `gemini-3.1-flash-lite` (primary) | Claim extraction, questions, clarify/retest scenarios, per-criterion grading, fix tasks, rewrites (structured JSON output) |
+| **Gemini API** `gemini-3.6-flash` (fallback; swap to primary once billing is on) | Single retry after a 429/5xx; primary is skipped during the quota "retry in Ns" window |
+| **Cloud Run** | Hosts the Express API (`unbluff-api`, asia-south1, 0–3 instances) |
+| **Cloud Build** | Builds the `backend/Dockerfile` image remotely (`gcloud run deploy --source backend`) |
+| **Artifact Registry** | Stores the built image |
+| **Firestore** (Native) | Session store on Cloud Run (`STORE=firestore`) |
+| **Secret Manager** | `gemini-api-key`, injected with `--set-secrets`, never in the image or repo |
+| **Cloud Logging** | Structured pino logs with Cloud Logging `severity`; every LLM call logs prompt, model, latency, validity |
+| **Firebase Hosting** | Serves the React frontend (`frontend/dist`, SPA rewrites) |
+
 ## Architecture: the LLM writes language, code decides the score
 
 ```mermaid
@@ -74,7 +91,7 @@ An LLM that grades itself is a black box that can be sweet-talked. UNBLUFF split
 5. **Failure is visible, not silent.** Invalid output after one retry, or a timeout, marks the claim
    `error`: excluded from coverage, never counted as pass or fail, and restartable.
 
-Live check (`npm run grade-check`, gemini-3.6-flash, GRADE prompt at L2 for "Walk me through what
+Live check (`npm run grade-check`, 6/6 on both gemini-3.6-flash and gemini-3.1-flash-lite, GRADE prompt at L2 for "Walk me through what
 happens from a state update to the UI changing"):
 
 | Case | Expected | Result |
@@ -104,6 +121,14 @@ Full contract (types, errors, display mapping, mock report): [`CONTRACT.md`](CON
 
 Errors are always `{ "error": { "code", "message" } }` with the codes listed in the contract.
 
+### DEMO_MODE_HINT
+
+If the live model is rate-limited (on the free tier `gemini-3.6-flash` allows only 20 requests/day), interrogation
+still degrades gracefully: fallback model, then a restartable `error` verdict. For a guaranteed
+demo, the UI can load `GET /api/demo/report`, a complete, contract-exact report built by the same
+deterministic core. Signs you are rate-limited: `502 LLM_INVALID_OUTPUT` on retest, or claims
+ending in verdict `error`.
+
 ## Run it
 
 Requirements: Node 20+.
@@ -121,7 +146,7 @@ LLM_MODE=mock npm run dev          # http://localhost:8080
 ```
 
 **Live mode** (Gemini). In `.env`, set `LLM_MODE=live`, `GEMINI_API_KEY`, `GEMINI_MODEL`
-(e.g. `gemini-3.6-flash`) and optionally `GEMINI_FALLBACK_MODEL` (e.g. `gemini-3.1-flash-lite`):
+(e.g. `gemini-3.1-flash-lite`) and optionally `GEMINI_FALLBACK_MODEL` (e.g. `gemini-3.6-flash`):
 
 ```bash
 npm run dev
@@ -148,6 +173,9 @@ sessions (`STORE=firestore`) and never bakes secrets into the image.
 
 ## Tests and quality
 
+Latest run: **111 tests passing** (16 files). Coverage: **93.2% lines / 83.8% branches overall**,
+**100% lines on `src/core`** (the deterministic scoring core; CI enforces ≥ 95%).
+
 ```bash
 cd backend
 npm test                 # vitest: unit + integration (supertest)
@@ -157,7 +185,8 @@ npm run grade-check      # live Gemini grading quality check (needs a key)
 ```
 
 - `tests/unit`: rules, evidence guard, state machine, scoring, plan, resume heatmap, report,
-  Gemini provider (retry, fallback, timeout via an injected fake client), contract drift guards.
+  Gemini provider (retry, fallback, timeout via an injected fake client), Firestore store (mocked
+  client), prompts, config, contract drift guards.
 - `tests/integration`: full HTTP flow, error contract, security (prompt injection, state guards,
   no stack traces), efficiency (report refetch = 0 LLM calls, double-submit graded once).
 - CI (GitHub Actions): lint → typecheck → test + coverage → build, for backend and frontend.

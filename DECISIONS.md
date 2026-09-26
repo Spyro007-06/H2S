@@ -38,7 +38,7 @@ Running log of judgement calls, contract notes, stubs and audit results.
 
 ## Live Gemini
 
-- **Model:** `gemini-3.6-flash` (≈1.5–3 s per call, reliable in testing). `gemini-2.5-flash` is not
+- **Model:** originally `gemini-3.6-flash` (≈1.5–3 s per call); switched to `gemini-3.1-flash-lite` as primary because of the free-tier daily cap (see Quota). `gemini-2.5-flash` is not
   available to new keys; `gemini-3.8-flash` / `gemini-flash-latest` returned frequent 503/429;
   `gemini-3.5-flash` timed out. `GEMINI_MODEL` stays required with no hardcoded default.
 - **Fallback model (addition):** `GEMINI_FALLBACK_MODEL` (e.g. `gemini-3.1-flash-lite`). On a 429/5xx
@@ -62,9 +62,10 @@ Running log of judgement calls, contract notes, stubs and audit results.
 
 ## Quota (important for the demo)
 
-- The provided key is on the **free tier: 20 requests/minute per model** (seen in 429 details).
-  A full session is about 30–40 calls, which is fine at human typing pace but back-to-back scripted
-  runs exceed it. Mitigations: fallback model + cooldown, report-time LLM calls capped at 2
+- The provided key is on the **free tier**. `gemini-3.6-flash` is capped at **20 requests/day**
+  (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`; an earlier note here wrongly said per minute).
+  A full session is 30–40 calls, so **`gemini-3.1-flash-lite` is now the primary** (6/6 on the grade check,
+  same as 3.6-flash) with 3.6-flash as the fallback. With billing on, swap them back. Mitigations: fallback model + cooldown, report-time LLM calls capped at 2
   concurrent and stopping after the first failure (templates fill in, next fetch retries),
   `SMOKE_DELAY` pacing in `smoke.sh`. **Enable billing on the key for the live demo.**
 - Retest mode returns 502/504 on LLM failure and saves nothing, so the same answer can be resent.
@@ -91,8 +92,17 @@ Running log of judgement calls, contract notes, stubs and audit results.
 
 - **Docker is not installed on the dev machine**, so `docker build` could not be run locally. The
   compiled `dist/` server (what the image runs) was built and smoke-tested with `node dist/src/server.js`.
-- **Firestore store** is implemented (`STORE=firestore`, ADC credentials) but not exercised against
-  a real project; tests use the memory store.
+- **Firestore store** is implemented (`STORE=firestore`, ADC credentials) and unit-tested with a mocked
+  client (round-trip, missing → null, nested serialization, overwrite). Not yet exercised against a
+  real project.
+- **Cloud Run deploy is blocked: the Google Cloud SDK (`gcloud`) is not installed** on the dev machine.
+  `backend/scripts/deploy.sh` is ready (`SETUP=1` enables APIs, creates Firestore, pipes the key from
+  `backend/.env` into Secret Manager via stdin, grants the runtime SA secretAccessor + datastore.user,
+  then `gcloud run deploy --source backend`).
+- **`is_demo` flag:** the deploy verification checklist asks to check `is_demo: true` on
+  `/api/demo/report`, but the frozen contract's `Report` type has no such field. It was not added;
+  the demo report is identifiable by `session_id: "s_demo"`. Adding `is_demo` needs both teams to agree
+  on a contract change.
 - `jq` isn't installed locally; `smoke.sh` uses jq when present, otherwise `scripts/jq-lite.mjs`.
 - Port 8080 is taken on the dev machine by an unrelated Windows service, so local runs used
   8090/8091. Express 5 reports bind errors through the `listen` callback, which is now handled
