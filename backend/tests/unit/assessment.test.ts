@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/errors.js";
+import { runLimited } from "../../src/services/assessment.js";
 import { ALL, GOOD, rawGrade, reactSession, ScriptedProvider, service } from "../helpers.js";
 
 const Q = "useState and useReducer";
@@ -113,5 +114,31 @@ describe("AssessmentService ladder", () => {
     await expect(svc.interrogate({ session_id: sid, claim_id: "CL-001", answer: "x" })).rejects.toBeInstanceOf(ApiError);
     await expect(svc.interrogate({ session_id: sid, claim_id: "CL-999" })).rejects.toMatchObject({ code: "CLAIM_NOT_FOUND" });
     await expect(svc.report("s_nope")).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+  });
+});
+
+describe("runLimited (report-time LLM concurrency)", () => {
+  it("never runs more than `limit` jobs at once and completes all on success", async () => {
+    let active = 0;
+    let peak = 0;
+    const jobs = Array.from({ length: 6 }, () => async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active--;
+    });
+    expect(await runLimited(jobs, 2)).toEqual({ done: 6, skipped: 0 });
+    expect(peak).toBe(2);
+  });
+
+  it("stops starting new jobs after the first failure", async () => {
+    const started: number[] = [];
+    const jobs = [0, 1, 2, 3, 4].map((i) => async () => {
+      started.push(i);
+      if (i === 0) throw new Error("429");
+    });
+    const res = await runLimited(jobs, 1);
+    expect(started).toEqual([0]);
+    expect(res).toEqual({ done: 0, skipped: 5 });
   });
 });

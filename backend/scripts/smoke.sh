@@ -3,6 +3,7 @@
 # health → roles → extract → confirm → interrogate every claim → report → fix-task → retest → report
 #
 #   API=http://localhost:8080 bash scripts/smoke.sh
+#   SMOKE_DELAY=7 API=... bash scripts/smoke.sh     # live mode on a free-tier key
 #
 # Answers mix strong answers, a short answer and "I don't know". Works in mock and live mode.
 set -euo pipefail
@@ -18,8 +19,12 @@ fi
 
 hr() { printf '\n==== %s ====\n' "$1"; }
 
+# Optional pacing for free-tier Gemini quotas (e.g. SMOKE_DELAY=7 for 20 requests/minute).
+pause() { if [[ -n "${SMOKE_DELAY:-}" ]]; then sleep "$SMOKE_DELAY"; fi; }
+
 post() { # post <path> <json>
   local out status
+  pause
   out=$(curl -sS --max-time "${CURL_TIMEOUT:-90}" -w '\n%{http_code}' -X POST "$API$1" -H 'Content-Type: application/json' --data-binary "$2")
   status="${out##*$'\n'}"
   out="${out%$'\n'*}"
@@ -51,6 +56,16 @@ STRONG_ANSWERS=(
   "I built it with useReducer for the cart and Redux Toolkit for products because the product list was shared by three pages; Context would have re-rendered every consumer on each change. The downside was boilerplate, and once a stale closure in a useEffect showed old prices until I added the dependency."
   "Step by step: the component calls setState, React marks the fiber dirty, on the next render it calls the component again, reconciles the returned elements with the previous tree and applies the minimal DOM updates in the commit phase, then runs effects."
 )
+REST_ANSWERS=(
+  "I personally wrote the Axios client for GET /products, POST /cart and POST /auth/login, with a request interceptor that adds the Authorization Bearer token."
+  "On a 401 my response interceptor calls POST /auth/refresh once, stores the new access token in memory, and replays the original request; if the refresh fails it clears the token and redirects to the login page."
+  "I kept the access token in memory rather than localStorage because any XSS script can read localStorage; the trade-off is that a hard refresh loses it until the httpOnly refresh cookie gets a new one, which caused a brief logged-out flash we had to handle."
+)
+CSS_ANSWERS=(
+  "I personally built the product listing page with CSS Grid using repeat(auto-fill, minmax(220px, 1fr)) for the cards, and used Flexbox for the header and the checkout form rows."
+  "auto-fill creates as many 220px tracks as fit in the container, then the 1fr maximum shares the leftover space equally, so the cards grow until another 220px column fits and the column count jumps."
+  "I chose Grid over flex-wrap because flex-wrap stretches the orphan cards in the last row wider than the others, while Grid keeps every track the same width; the downside was overflow in a 280px sidebar, which I fixed with minmax(min(220px, 100%), 1fr)."
+)
 SHORT_ANSWER="It just works fine."
 GAP_ANSWER="Honestly, I don't know how that part works internally."
 
@@ -71,22 +86,27 @@ CLAIMS_JSON=$(echo "$EXTRACT" | node -e '
   process.stdout.write(JSON.stringify(b.claims.map(({ id, text, resume_line, skill_id }) => ({ id, text, resume_line, skill_id }))));')
 post /claims/confirm "{\"session_id\":\"$SID\",\"claims\":$CLAIMS_JSON}" | jqr '.progress'
 
-answer_for() { # answer_for <claim index> <turn number>
-  local idx=$1 n=$2
+answer_for() { # answer_for <claim index> <turn number> <skill id>
+  local idx=$1 n=$2 skill=$3 k=$(( ($2 - 1) % 3 ))
   if (( idx == 1 && n == 2 )); then echo "$SHORT_ANSWER"; return; fi   # 2nd claim: short answer at L2 → shaky
   if (( idx == 3 )); then echo "$GAP_ANSWER"; return; fi                # 4th claim: honest gap
-  echo "${STRONG_ANSWERS[$(( (n - 1) % 3 ))]}"
+  case "$skill" in
+    rest_apis) echo "${REST_ANSWERS[$k]}" ;;
+    responsive_css) echo "${CSS_ANSWERS[$k]}" ;;
+    *) echo "${STRONG_ANSWERS[$k]}" ;;   # React answers: on-topic for React claims, off-topic (and graded so) elsewhere
+  esac
 }
 
 for (( i = 0; i < COUNT; i++ )); do
   CID=$(echo "$EXTRACT" | jqr ".claims[$i].id")
-  hr "interrogate $CID"
+  SKILL=$(echo "$EXTRACT" | jqr ".claims[$i].skill_id")
+  hr "interrogate $CID ($SKILL)"
   TURN=$(post /interrogate "{\"session_id\":\"$SID\",\"claim_id\":\"$CID\"}")
   echo "Q (L$(echo "$TURN" | jqr '.level')): $(echo "$TURN" | jqr '.question')"
   n=0
   while [[ "$(echo "$TURN" | jqr '.turn')" != "done" ]]; do
     n=$((n + 1))
-    A=$(answer_for "$i" "$n")
+    A=$(answer_for "$i" "$n" "$SKILL")
     echo "A: $A"
     TURN=$(post /interrogate "{\"session_id\":\"$SID\",\"claim_id\":\"$CID\",\"answer\":$(json_str "$A")}")
     echo "   level_passed=$(echo "$TURN" | jqr '.grade.level_passed')  guard_flips=$(echo "$TURN" | jqr '.grade.guard_flips | length')  turn=$(echo "$TURN" | jqr '.turn')"
@@ -103,10 +123,10 @@ REPORT=$(get "/report/$SID")
 echo "$REPORT" | jqr '.'
 echo "readiness=$(echo "$REPORT" | jqr '.readiness') coverage=$(echo "$REPORT" | jqr '.coverage')"
 
-WEAK=$(echo "$REPORT" | node -e '
+read -r WEAK WEAK_SKILL < <(echo "$REPORT" | node -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const c = r.claims.find((c) => c.verdict === "shaky") ?? r.claims.find((c) => ["bluff", "honest_gap"].includes(c.verdict));
-  process.stdout.write(c ? c.id : "");')
+  console.log(c ? c.id + " " + c.skill_id : "");') || true
 if [[ -z "$WEAK" ]]; then echo "No weak claim to fix/retest"; exit 0; fi
 
 hr "fix-task $WEAK"
@@ -118,7 +138,8 @@ echo "Q (L$(echo "$TURN" | jqr '.level'), retest): $(echo "$TURN" | jqr '.questi
 n=0
 while [[ "$(echo "$TURN" | jqr '.turn')" != "done" ]]; do
   n=$((n + 1))
-  A="${STRONG_ANSWERS[$(( (n - 1) % 3 ))]}"
+  LEVEL=$(echo "$TURN" | jqr '.level')
+  A=$(answer_for -1 "$LEVEL" "$WEAK_SKILL")   # strong, on-topic answer for this level
   echo "A: $A"
   TURN=$(post /interrogate "{\"session_id\":\"$SID\",\"claim_id\":\"$WEAK\",\"answer\":$(json_str "$A")}")
   echo "   level_passed=$(echo "$TURN" | jqr '.grade.level_passed') turn=$(echo "$TURN" | jqr '.turn')"

@@ -11,8 +11,10 @@ ${studentBlock("student_answer", ctx.answer)}
 What this level requires:
 ${criteriaList(ctx.skill, ctx.level)}
 
+Relevance first: every criterion is judged against THIS question and THIS claim. An answer that talks about something else (another technology, another project, a memorised speech) fails accuracy and specificity even if its statements are true.
+
 For EACH criterion return "passed", "evidence_quote" and "missing_concept":
-- accuracy: the technical content is correct. Fluent but wrong = false. Buzzwords stitched into a wrong causal story (e.g. "hooks make it faster", "the virtual DOM caches everything") = false.
+- accuracy: nothing stated is technically wrong. Fluent but wrong = false. Buzzwords stitched into a wrong causal story (e.g. "hooks make it faster", "the virtual DOM caches everything") = false. A correct but thin answer keeps accuracy = true (thinness is judged by specificity and mechanism, not accuracy).
 - specificity: names concrete tech, components, numbers. Buzzwords only = false.
 - mechanism: explains HOW it works, step by step. Stating THAT something happens is not a mechanism.
 - ownership: clear about what THEY personally did (not only "we", not the library's work).

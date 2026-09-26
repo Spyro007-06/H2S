@@ -362,22 +362,19 @@ export class AssessmentService {
   report(sessionId: string): Promise<Report> {
     return this.withSession(sessionId, async (session, role) => {
       // Generate missing language outputs for weak claims once; cached on the claim afterwards.
-      const jobs: Promise<void>[] = [];
+      const jobs: (() => Promise<void>)[] = [];
       for (const claim of session.claims.filter((c) => isWeakVerdict(c.verdict))) {
         if (!claim.fix_task) {
-          jobs.push(this.generateFixTask(role, claim).then((t) => void (claim.fix_task = t)));
+          jobs.push(async () => void (claim.fix_task = await this.generateFixTask(role, claim)));
         }
         if (!claim.rewrite && claim.resume_line) {
-          jobs.push(
-            this.deps.llm
-              .rewrite({ claim, evidenceSummary: evidenceSummary(claim) })
-              .then((r) => void (claim.rewrite = r)),
-          );
+          jobs.push(async () => void (claim.rewrite = await this.deps.llm.rewrite({ claim, evidenceSummary: evidenceSummary(claim) })));
         }
       }
-      const results = await Promise.allSettled(jobs);
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) this.deps.logger.warn({ session: session.id, failed }, "report: some fix tasks/rewrites failed; using templates");
+      const { done, skipped } = await runLimited(jobs, REPORT_LLM_CONCURRENCY);
+      if (skipped > 0) {
+        this.deps.logger.warn({ session: session.id, done, skipped }, "report: LLM enrichment stopped early; using templates, will retry on next fetch");
+      }
       return buildReport({ ...session, session_id: session.id }, role, this.now().toISOString());
     });
   }
@@ -430,6 +427,32 @@ export class AssessmentService {
 }
 
 // ---------- module helpers ----------
+
+/** Report-time LLM calls in flight at once (protects per-minute quota for interrogation). */
+export const REPORT_LLM_CONCURRENCY = 2;
+
+/**
+ * Runs jobs with bounded concurrency. After the first failure no new jobs start (a failure is
+ * usually quota or an outage, so hammering on is pointless); in-flight jobs finish.
+ */
+export async function runLimited(jobs: (() => Promise<void>)[], limit: number): Promise<{ done: number; skipped: number }> {
+  let next = 0;
+  let done = 0;
+  let failed = false;
+  const worker = async () => {
+    while (!failed && next < jobs.length) {
+      const job = jobs[next++] as () => Promise<void>;
+      try {
+        await job();
+        done++;
+      } catch {
+        failed = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+  return { done, skipped: jobs.length - done };
+}
 
 function dedupe(items: string[]): string[] {
   const seen = new Set<string>();

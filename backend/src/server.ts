@@ -1,4 +1,5 @@
 import "dotenv/config";
+import type { ThinkingLevel } from "@google/genai";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +26,8 @@ function createProvider(config: Config, logger: ReturnType<typeof createLogger>)
   return new GeminiProvider({
     apiKey: config.GEMINI_API_KEY,
     model: config.GEMINI_MODEL as string, // required by loadConfig in live mode
+    fallbackModel: config.GEMINI_FALLBACK_MODEL,
+    gradeThinking: config.GRADE_THINKING as ThinkingLevel,
     vertexai: config.GOOGLE_GENAI_USE_VERTEXAI,
     project: config.GOOGLE_CLOUD_PROJECT,
     location: config.GOOGLE_CLOUD_LOCATION,
