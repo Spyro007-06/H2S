@@ -3,14 +3,14 @@ import type {
   Claim,
   BlindSpot,
   Progress,
-  PreparationMode,
+  SessionMode,
 } from "@/types/contract";
 import { SessionContext } from "./contexts";
 
 export interface SessionState {
   sessionId: string | null;
   roleId: string | null;
-  prepMode: PreparationMode | null;
+  mode: SessionMode | null;
   claims: Claim[];
   blindSpots: BlindSpot[];
   progress: Progress | null;
@@ -22,7 +22,7 @@ export type SessionAction =
       payload: {
         sessionId: string;
         roleId: string;
-        prepMode?: PreparationMode;
+        mode?: SessionMode;
         claims?: Claim[];
         blindSpots?: BlindSpot[];
         progress?: Progress;
@@ -47,7 +47,7 @@ export type SessionAction =
 const initialState: SessionState = {
   sessionId: null,
   roleId: null,
-  prepMode: null,
+  mode: null,
   claims: [],
   blindSpots: [],
   progress: null,
@@ -60,7 +60,7 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         ...state,
         sessionId: action.payload.sessionId,
         roleId: action.payload.roleId,
-        prepMode: action.payload.prepMode ?? state.prepMode,
+        mode: action.payload.mode ?? state.mode,
         claims: action.payload.claims ?? state.claims,
         blindSpots: action.payload.blindSpots ?? state.blindSpots,
         progress: action.payload.progress ?? state.progress,

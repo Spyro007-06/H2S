@@ -45,6 +45,7 @@ export const api = {
   /**
    * POST /api/claims/extract
    * Creates the session and extracts claims from resume and/or declared skills.
+   * `mode` ("prepare" | "defense") selects teach-as-you-go vs interview simulation.
    */
   async extractClaims(payload: ExtractRequest): Promise<ClaimsResponse> {
     return apiClient<ClaimsResponse>("/claims/extract", {
