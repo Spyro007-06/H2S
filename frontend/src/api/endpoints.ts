@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { mockApi } from "@/mocks/mockApi";
 import type {
   HealthResponse,
   RolesResponse,
@@ -18,7 +19,7 @@ import type {
  * Strict 1:1 mapping with frozen endpoints in CONTRACT.md §5.
  * This is a thin transport layer with zero local scoring or business decisions.
  */
-export const api = {
+const realApi = {
   /**
    * GET /api/health
    */
@@ -105,3 +106,14 @@ export const api = {
     return apiClient<Report>("/demo/report", { method: "GET" });
   },
 };
+
+/**
+ * `VITE_MOCK_API=true` swaps every call above for the in-browser mock
+ * backend (src/mocks/) — see vite-env.d.ts. Also requires `import.meta.env.DEV`
+ * (a Vite compile-time constant, always false for `vite build`) so a stray
+ * local .env can never ship the mock into a real production bundle — the
+ * `DEV` check lets esbuild dead-code-eliminate `mockApi` from that build
+ * entirely, regardless of what VITE_MOCK_API happens to be set to.
+ */
+export const api: typeof realApi =
+  import.meta.env.DEV && import.meta.env.VITE_MOCK_API === "true" ? mockApi : realApi;

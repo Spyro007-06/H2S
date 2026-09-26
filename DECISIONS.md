@@ -111,6 +111,70 @@ Running log of judgement calls, contract notes, stubs and audit results.
   actually uploaded restored the main bundle to ~222KB; pdf.js now ships as
   its own on-demand chunk.
 
+## Demo Completion Sprint — full loop, frontend-only
+
+- **Confirmed again the backend has no HTTP server.** `backend/src/routes/`,
+  `middleware/`, `validation/` now exist as folders but are still empty
+  (`.gitkeep` only); there is still no `server.ts`. Per explicit user
+  direction, this sprint stayed frontend-only: every screen below is built
+  against the real API client and real contract types, verified with
+  mocked-response tests, but never exercised against a live backend because
+  none exists yet. The demo cannot go live end-to-end until someone
+  implements the HTTP layer over the existing (already unit-tested) core
+  logic.
+- **Fix Task + Retest have no dedicated routes.** They're states within the
+  existing `/interrogate` and `/report/:sessionId` routes (inline
+  `FixTaskCard` when the backend sets `teach_now`; the Evidence Drawer's
+  "Get Fix Task" / "Retest this claim" on the Report page), per "adapt to
+  the existing router, don't create unnecessary nesting."
+- **`retest_status: "scheduled"` renders as "Retest scheduled", not
+  "Retest in N concepts."** No contract field carries that count (checked
+  `Claim`, `Progress`, `RetestResult` — none has it), so showing a number
+  would be inventing data.
+- **Before → After is shown as proficiency percentages, not verdict
+  words.** `RetestResult.before`/`after` are proficiency numbers (0..1);
+  there's no backend field for "the verdict before this retest," and
+  deriving one would mean replicating the proficiency→verdict mapping
+  that's explicitly backend-owned. Showing "25% → 100%" is honest; showing
+  "Shaky → Defended" would require frontend-side scoring logic.
+- **`EvidenceDrawer` handles Escape and initial/restore focus, not a full
+  Tab-cycle trap.** Flagged as a minor, non-blocking accessibility
+  follow-up rather than adding a focus-trap utility mid-sprint.
+
+## In-browser mock backend (src/mocks/)
+
+- **Added an opt-in mock backend so the frontend is actually clickable
+  before the real HTTP layer exists.** `VITE_MOCK_API=true` (local `.env`
+  only, gitignored, documented in `.env.example`) swaps `api.*` in
+  `src/api/endpoints.ts` for `mockApi`, which implements the exact same
+  method signatures using an in-memory session store. It reuses the real
+  `backend/data/roles/frontend_developer.json` content verbatim (copied
+  into `src/mocks/roleFixture.ts`) so role/skill data isn't invented, and
+  computes readiness/coverage/priorities using the exact formulas
+  documented in `CONTRACT.md` §5 (`src/mocks/report.ts`).
+- **Safety: the mock requires `import.meta.env.DEV` in addition to the
+  flag.** First cut only checked `VITE_MOCK_API === "true"`, and since Vite
+  loads the local `.env` for `vite build` too, a stray local `.env` would
+  have silently baked the mock into what should be a real production
+  bundle (confirmed: main bundle grew from ~246KB to ~264KB gzip once
+  `.env` existed with the flag set, before this fix). `import.meta.env.DEV`
+  is a Vite compile-time constant that's always `false` for a standard
+  production build, so esbuild dead-code-eliminates `mockApi` from that
+  build regardless of what `VITE_MOCK_API` happens to be — confirmed the
+  bundle returned to ~246KB after adding the `DEV &&` guard.
+- **Vitest also loads the local `.env`, which broke two real-API tests.**
+  `tests/landing.test.tsx` mocks `global.fetch` to test the *real*
+  `apiClient` path; with a local `.env` setting `VITE_MOCK_API=true`, the
+  test run silently started resolving `api` to `mockApi` instead, since
+  Vitest shares Vite's env-loading. Fixed by pinning `VITE_MOCK_API=false`
+  in `vite.config.ts`'s `test.env`, so test runs are deterministic
+  regardless of a developer's local dev-mode settings.
+- The grading/question logic in `src/mocks/grading.ts` and
+  `src/mocks/questions.ts` is an explicitly-labeled toy heuristic (answer
+  length + keyword/word heuristics) that exists only to make the mock
+  react to input — it is not, and must never become, real assessment logic
+  living outside `src/mocks/`.
+
 ## LLM failures
 
 - Assess mode: invalid output / timeout ends the claim with verdict `error` (restartable).

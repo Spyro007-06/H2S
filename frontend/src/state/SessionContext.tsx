@@ -41,6 +41,10 @@ export type SessionAction =
       payload: Progress;
     }
   | {
+      type: "UPDATE_CLAIM";
+      payload: { claim: Claim; progress?: Progress };
+    }
+  | {
       type: "CLEAR_SESSION";
     };
 
@@ -76,6 +80,14 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return {
         ...state,
         progress: action.payload,
+      };
+    case "UPDATE_CLAIM":
+      return {
+        ...state,
+        claims: state.claims.map((c) =>
+          c.id === action.payload.claim.id ? action.payload.claim : c
+        ),
+        progress: action.payload.progress ?? state.progress,
       };
     case "CLEAR_SESSION":
       return initialState;

@@ -8,6 +8,7 @@ interface VitestConfig extends UserConfig {
     environment: string;
     setupFiles: string[];
     include: string[];
+    env: Record<string, string>;
   };
 }
 
@@ -32,5 +33,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.{test,spec}.{ts,tsx}"],
+    // Tests must be deterministic regardless of a developer's local .env
+    // (e.g. VITE_MOCK_API=true for local demoing) — always exercise the
+    // real API wrapper here; mock-backend behavior isn't unit-tested.
+    env: { VITE_MOCK_API: "false" },
   },
 } as VitestConfig);

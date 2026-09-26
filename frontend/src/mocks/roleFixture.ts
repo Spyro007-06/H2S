@@ -1,0 +1,192 @@
+import type { Role } from "@/types/contract";
+
+/**
+ * Mirrors backend/data/roles/frontend_developer.json exactly (same ids,
+ * weights, keywords, level criteria) so the mock backend behaves like the
+ * real one once it exists — this is not invented role data, it's a copy of
+ * the real fixture the backend already ships.
+ */
+export const FRONTEND_DEVELOPER_ROLE: Role = {
+  id: "frontend_developer",
+  name: "Frontend Developer",
+  description:
+    "Entry-level frontend developer building accessible, tested React interfaces against REST APIs.",
+  skills: [
+    {
+      id: "js_fundamentals",
+      name: "JavaScript Fundamentals",
+      weight: 0.2,
+      description:
+        "Core language: scope, closures, the event loop, promises, modules, and performance basics such as code splitting.",
+      keywords: [
+        "javascript", "js", "typescript", "es6", "closure", "event loop",
+        "promise", "lazy loading", "code splitting", "webpack", "vite", "dom", "node",
+      ],
+      levels: {
+        L1: [
+          "Names the exact language features used in the project (e.g. closures, async/await, modules)",
+          "States which code they personally wrote versus library or teammate code",
+        ],
+        L2: [
+          "Explains the event loop order: call stack, microtasks (promises) before macrotasks (timers)",
+          "Explains how closures capture variables by reference, not value",
+          "Explains how dynamic import() splits a bundle and loads a chunk on demand",
+        ],
+        L3: [
+          "Compares approaches, e.g. async/await vs raw promises vs callbacks, with a concrete downside of each",
+          "Describes a real bug they hit (stale closure, unhandled rejection, race) and how they fixed it",
+        ],
+      },
+    },
+    {
+      id: "react_state",
+      name: "React State & Rendering",
+      weight: 0.2,
+      description:
+        "Component state, hooks, re-render behaviour, reconciliation, and global state libraries such as Redux or Context.",
+      keywords: [
+        "react", "redux", "hooks", "usestate", "useeffect", "context",
+        "zustand", "next.js", "nextjs", "component", "jsx", "state",
+      ],
+      levels: {
+        L1: [
+          "Names the specific components, hooks or stores they built and what data each held",
+          "Is explicit about their personal contribution versus the team's",
+        ],
+        L2: [
+          "Explains that a state update schedules a re-render of that component and its children",
+          "Explains reconciliation: new virtual DOM tree diffed against the previous one, keys used to match list items, minimal DOM commits",
+          "Explains when effects run relative to render and commit",
+        ],
+        L3: [
+          "Justifies local state vs Context vs Redux with a concrete cost of each (prop drilling, re-render scope, boilerplate)",
+          "Describes a performance or stale-state problem and the fix (memo, useCallback, splitting context, selectors)",
+        ],
+      },
+    },
+    {
+      id: "rest_apis",
+      name: "REST APIs & Async",
+      weight: 0.15,
+      description:
+        "Consuming HTTP APIs from the browser: fetch/axios, status codes, auth headers, loading and error states, caching.",
+      keywords: [
+        "rest", "api", "axios", "fetch", "http", "jwt", "auth",
+        "graphql", "endpoint", "json", "backend", "express",
+      ],
+      levels: {
+        L1: [
+          "Names the endpoints, HTTP methods and library used, and what the UI did with the responses",
+          "States what they personally implemented (client calls, auth handling, error UI)",
+        ],
+        L2: [
+          "Explains the request lifecycle: headers (e.g. Authorization bearer token), status codes, JSON parsing, error branches",
+          "Explains how loading, error and success states are represented in the UI",
+        ],
+        L3: [
+          "Discusses trade-offs such as token storage (localStorage vs httpOnly cookie), retries, caching or request cancellation",
+          "Describes a real failure (CORS, 401 expiry, race between requests) and how it was handled",
+        ],
+      },
+    },
+    {
+      id: "responsive_css",
+      name: "HTML/CSS & Responsive UI",
+      weight: 0.15,
+      description:
+        "Semantic HTML, layout with Flexbox and Grid, media queries, mobile-first design and CSS architecture.",
+      keywords: [
+        "css", "html", "responsive", "flexbox", "grid", "tailwind",
+        "bootstrap", "sass", "media query", "mobile", "layout", "ui",
+      ],
+      levels: {
+        L1: [
+          "Names the layouts or pages they built and the CSS techniques used (Grid, Flexbox, media queries, a framework)",
+          "Is clear about which screens or components they styled themselves",
+        ],
+        L2: [
+          "Explains how Flexbox distributes space (main/cross axis, flex-grow/shrink/basis) or how Grid tracks and fr units work",
+          "Explains how breakpoints and mobile-first media queries change the layout",
+        ],
+        L3: [
+          "Justifies Grid vs Flexbox (or a framework vs hand-written CSS) for a specific layout",
+          "Describes a layout bug (overflow, specificity clash, layout shift) and the fix",
+        ],
+      },
+    },
+    {
+      id: "accessibility",
+      name: "Accessibility",
+      weight: 0.1,
+      description:
+        "Building UIs usable with keyboard and screen readers: semantic markup, ARIA, focus management, contrast.",
+      keywords: [
+        "accessibility", "a11y", "aria", "wcag", "screen reader",
+        "keyboard", "semantic", "contrast", "lighthouse",
+      ],
+      levels: {
+        L1: [
+          "Names concrete accessibility work done (labels, alt text, keyboard support, contrast fixes) on specific components",
+          "States what they personally tested or fixed",
+        ],
+        L2: [
+          "Explains how screen readers use the accessibility tree built from semantic elements, names and roles",
+          "Explains focus management: tab order, focus trapping in dialogs, returning focus",
+        ],
+        L3: [
+          "Justifies native elements over ARIA (first rule of ARIA) with an example",
+          "Describes an accessibility bug found via keyboard, screen reader or audit, and the fix",
+        ],
+      },
+    },
+    {
+      id: "testing",
+      name: "Testing & Debugging",
+      weight: 0.1,
+      description:
+        "Unit and component tests (Jest, Vitest, Testing Library), mocking, coverage, and debugging with devtools.",
+      keywords: [
+        "test", "testing", "jest", "vitest", "cypress", "playwright",
+        "unit test", "coverage", "debug", "testing library",
+      ],
+      levels: {
+        L1: [
+          "Names the test framework and which components or functions they tested",
+          "States what they personally wrote and what the coverage number actually measured",
+        ],
+        L2: [
+          "Explains how a test isolates a unit: rendering, mocking network or modules, and assertions on behaviour",
+          "Explains what coverage measures (lines/branches executed), not correctness",
+        ],
+        L3: [
+          "Discusses unit vs integration vs end-to-end trade-offs, or testing behaviour vs implementation details",
+          "Describes a bug a test caught or a flaky test and how it was fixed",
+        ],
+      },
+    },
+    {
+      id: "git",
+      name: "Git",
+      weight: 0.1,
+      description:
+        "Version control in a team: branching, commits, pull requests, merge conflicts, rebasing.",
+      keywords: ["git", "github", "gitlab", "version control", "pull request", "branch", "merge", "ci"],
+      levels: {
+        L1: [
+          "Describes their actual team workflow: branches, pull requests, reviews",
+          "States what they personally did (resolved conflicts, reviewed PRs, set up CI)",
+        ],
+        L2: [
+          "Explains what a commit is (snapshot + parent pointer) and how a merge or rebase combines histories",
+          "Explains how a merge conflict arises and the steps to resolve it",
+        ],
+        L3: [
+          "Compares merge vs rebase (or squash) with a concrete downside of each",
+          "Describes a real mistake (force push, lost work, bad merge) and how it was recovered",
+        ],
+      },
+    },
+  ],
+};
+
+export const MOCK_ROLES: Role[] = [FRONTEND_DEVELOPER_ROLE];

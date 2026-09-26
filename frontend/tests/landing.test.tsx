@@ -55,7 +55,7 @@ describe("Landing — demo report flow", () => {
     expect(screen.getByText("s_demo_123")).toBeInTheDocument();
     expect(screen.getByText("Demo data")).toBeInTheDocument();
     expect(screen.getByText("Frontend Developer")).toBeInTheDocument();
-    expect(screen.getByText("52%")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Readiness: 52%" })).toBeInTheDocument();
   });
 
   it("shows a safe error message and retries the same request on failure", async () => {
