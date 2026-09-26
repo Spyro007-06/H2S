@@ -37,13 +37,19 @@ export function usePdfExtractor() {
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
+        // Keep the PDF's line breaks: each resume line becomes its own claim / heatmap row.
         const pageText = content.items
-          .map((item) => ("str" in item ? item.str : ""))
-          .join(" ");
+          .map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : " ") : ""))
+          .join("");
         pageTexts.push(pageText);
       }
 
-      const text = pageTexts.join("\n\n").replace(/[ \t]+/g, " ").trim();
+      const text = pageTexts
+        .join("\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
       if (!text) {
         setError(
           "That PDF doesn't contain any readable text. Try another file or paste your resume instead."

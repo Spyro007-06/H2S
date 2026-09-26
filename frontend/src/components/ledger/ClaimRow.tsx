@@ -22,6 +22,7 @@ export const ClaimRow: React.FC<ClaimRowProps> = ({ index, claim, skills, onChan
       <input
         id={textId}
         value={claim.text}
+        maxLength={300}
         onChange={(e) => onChange({ ...claim, text: e.target.value })}
         className="w-full rounded-md border border-line-strong px-3 py-2 text-sm"
       />

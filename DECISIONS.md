@@ -291,3 +291,9 @@ everything once gcloud is available.
   per test, and the gate has its own tests.
 - **No `gh` CLI here**, so no GitHub PR was opened. `integration` was merged into `main` with a `--no-ff`
   merge commit (never force-pushed). CI runs on the push to main.
+- **Bug fix (backend): one-line resumes.** A resume pasted from a PDF arrived as one ~3000-char line;
+  extract turned it into a single claim that `/claims/confirm` then rejected (text ≤ 300,
+  resume_line ≤ 500). Extract now normalises the resume (bullets `• ● ▪ ◦` start new lines, spaces
+  collapse) and clamps claim text/resume_line to the confirm limits on a word boundary, so extract can
+  never return what confirm refuses. The frontend PDF import now keeps line breaks (`hasEOL`). This was
+  a backend change during frontend integration, made because the contract invariant was broken.

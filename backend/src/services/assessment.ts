@@ -15,7 +15,16 @@ import type {
 } from "../types.js";
 import { ApiError } from "../errors.js";
 import type { Logger } from "../logger.js";
-import { claimId, MAX_CLAIMS, matchSkillByKeywords, newClaim } from "../core/claims.js";
+import {
+  clampText,
+  claimId,
+  MAX_CLAIM_TEXT,
+  MAX_CLAIMS,
+  MAX_RESUME_LINE,
+  matchSkillByKeywords,
+  newClaim,
+  normalizeResume,
+} from "../core/claims.js";
 import { isVerbatimQuote, normalizeText } from "../core/evidence.js";
 import { buildReport } from "../core/report.js";
 import {
@@ -86,7 +95,7 @@ export class AssessmentService {
 
   async extract(input: ExtractInput): Promise<ClaimsResponse> {
     const role = this.role(input.role_id);
-    const resume = input.resume_text?.trim() ? input.resume_text.trim() : null;
+    const resume = input.resume_text?.trim() ? normalizeResume(input.resume_text) || null : null;
     const chips = dedupe((input.declared_skills ?? []).map((s) => s.trim()).filter(Boolean));
     if (!resume && chips.length === 0) {
       throw new ApiError("BAD_REQUEST", "Provide resume_text or at least one declared skill");
@@ -109,15 +118,15 @@ export class AssessmentService {
       seen.add(key);
       claims.push(
         newClaim(claimId(seq++), {
-          text: c.text.trim(),
-          resume_line: line,
+          text: clampText(c.text, MAX_CLAIM_TEXT),
+          resume_line: clampText(line, MAX_RESUME_LINE),
           skill_id: c.skill_id && validSkills.has(c.skill_id) ? c.skill_id : null,
           source: "resume",
         }),
       );
     }
     for (const chip of chips) {
-      const text = `Knows ${chip}`;
+      const text = clampText(`Knows ${chip}`, MAX_CLAIM_TEXT);
       if (seen.has(normalizeText(text))) continue;
       seen.add(normalizeText(text));
       claims.push(
