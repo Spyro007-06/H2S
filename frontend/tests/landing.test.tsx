@@ -6,6 +6,7 @@ import type { Report } from "@/types/contract";
 
 const mockReport: Report = {
   session_id: "s_demo_123",
+  mode: "defense",
   role: { id: "frontend_developer", name: "Frontend Developer" },
   generated_at: "2026-01-01T00:00:00Z",
   readiness: 52,
@@ -17,7 +18,7 @@ const mockReport: Report = {
   resume_lines: [],
   priorities: [],
   plan: [],
-  progress: { claims_total: 0, claims_done: 0, next_claim_id: null },
+  progress: { claims_total: 0, claims_done: 0, next_claim_id: null, next_mode: null },
 };
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
@@ -49,13 +50,11 @@ describe("Landing — demo report flow", () => {
 
     expect(await screen.findByText(/Preparing demo report…/i)).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Readiness Report" })).toBeInTheDocument();
-    });
-    expect(screen.getByText("s_demo_123")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Readiness report" })).toBeInTheDocument();
     expect(screen.getByText("Demo data")).toBeInTheDocument();
-    expect(screen.getByText("Frontend Developer")).toBeInTheDocument();
-    expect(screen.getByText("52%")).toBeInTheDocument();
+    expect(screen.getByText(/Frontend Developer/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Readiness 52 out of 100" })).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1); // the report handed over via router state is not refetched
   });
 
   it("shows a safe error message and retries the same request on failure", async () => {

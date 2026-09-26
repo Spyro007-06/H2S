@@ -6,11 +6,11 @@ import { ResumeInput } from "@/components/setup/ResumeInput";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { buttonClasses } from "@/lib/buttonClasses";
 import { useExtractClaims } from "@/hooks/useExtractClaims";
-import type { PreparationMode } from "@/types/contract";
+import type { SessionMode } from "@/types/contract";
 
 export const SetupPage: React.FC = () => {
   const [roleId, setRoleId] = useState<string | null>(null);
-  const [mode, setMode] = useState<PreparationMode | null>(null);
+  const [mode, setMode] = useState<SessionMode | null>(null);
   const [resumeText, setResumeText] = useState("");
   const { isLoading, error, extract } = useExtractClaims();
 
@@ -18,7 +18,7 @@ export const SetupPage: React.FC = () => {
 
   function handleSubmit() {
     if (!canSubmit || !roleId || !mode) return;
-    void extract({ role_id: roleId, resume_text: resumeText }, mode);
+    void extract({ role_id: roleId, mode, resume_text: resumeText });
   }
 
   return (

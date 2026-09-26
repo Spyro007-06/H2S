@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/endpoints";
 import { useSessionState } from "@/state/useSession";
-import type { ExtractRequest, PreparationMode } from "@/types/contract";
+import type { ExtractRequest } from "@/types/contract";
 
 /**
  * POST /api/claims/extract — the frontend never extracts, interprets or
@@ -17,7 +17,7 @@ export function useExtractClaims() {
   const [error, setError] = useState<unknown>(null);
 
   const extract = useCallback(
-    async (request: ExtractRequest, prepMode: PreparationMode) => {
+    async (request: ExtractRequest) => {
       setIsLoading(true);
       setError(null);
       try {
@@ -27,7 +27,7 @@ export function useExtractClaims() {
           payload: {
             sessionId: res.session_id,
             roleId: res.role_id,
-            prepMode,
+            mode: res.mode,
             claims: res.claims,
             blindSpots: res.blind_spots,
             progress: res.progress,
