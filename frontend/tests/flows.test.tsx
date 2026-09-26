@@ -178,3 +178,37 @@ describe("Report", () => {
     expect(line).toHaveFocus();
   });
 });
+
+describe("Server wake-up gate", () => {
+  it("shows the waking status after 3s, then disappears when /api/health answers", async () => {
+    vi.useFakeTimers();
+    let resolveHealth: (v: Response) => void = () => undefined;
+    const original = global.fetch;
+    global.fetch = vi.fn(() => new Promise<Response>((r) => (resolveHealth = r))) as unknown as typeof fetch;
+    const { ServerWakeGate } = await import("@/components/common/ServerWakeGate");
+    const { act } = await import("@testing-library/react");
+    render(<ServerWakeGate />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await act(async () => {
+      vi.advanceTimersByTime(3100);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Waking up the server… (~30–60s)");
+    await act(async () => {
+      resolveHealth(new Response(JSON.stringify({ status: "ok", llm_mode: "mock", model: null }), { headers: { "content-type": "application/json" } }));
+    });
+    vi.useRealTimers();
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    global.fetch = original;
+  });
+
+  it("shows an alert with Retry when the server can't be reached", async () => {
+    const original = global.fetch;
+    global.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+    const { ServerWakeGate } = await import("@/components/common/ServerWakeGate");
+    render(<ServerWakeGate />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't reach the server.");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    global.fetch = original;
+  });
+});

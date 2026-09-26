@@ -8,6 +8,7 @@ import { SetupPage } from "@/pages/SetupPage";
 import { LedgerPage } from "@/pages/LedgerPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { DemoReportButton } from "@/components/common/DemoReportButton";
+import { ServerWakeGate } from "@/components/common/ServerWakeGate";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { buttonClasses } from "@/lib/buttonClasses";
 import { cn } from "@/lib/cn";
@@ -65,6 +66,8 @@ export const App: React.FC = () => (
     <InterrogationProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="flex min-h-screen flex-col bg-surface-50 text-ink-primary">
+          {/* Unit tests mock the API per test, so the wake-up ping only runs in the real app. */}
+          {import.meta.env.MODE !== "test" && <ServerWakeGate />}
           <header className="border-b border-line bg-white px-4 py-4 sm:px-6">
             <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Link
